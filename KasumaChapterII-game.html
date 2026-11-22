@@ -149,12 +149,26 @@
     #mission-list li.next { color: #fff; font-weight: 600; }
     #mission-list li.opt::after { content: ' (opsyonal)'; font-size: 0.62rem; opacity: 0.7; }
     #mission-list .dist { color: var(--accent-gold); margin-left: 4px; }
+
+    /* ---------- FOG EFFECTS ---------- */
+    .fog-layer { position: fixed; inset: -10%; pointer-events: none; z-index: 4; opacity: 0.55; mix-blend-mode: screen; will-change: transform; }
+    #fog-a { background: radial-gradient(ellipse 40% 25% at 20% 70%, rgba(150,175,165,0.30), transparent 70%), radial-gradient(ellipse 45% 22% at 75% 80%, rgba(140,165,160,0.26), transparent 70%), radial-gradient(ellipse 35% 20% at 50% 55%, rgba(130,155,150,0.18), transparent 70%); animation: fogDriftA 38s ease-in-out infinite alternate; }
+    #fog-b { background: radial-gradient(ellipse 50% 24% at 70% 65%, rgba(160,180,170,0.24), transparent 70%), radial-gradient(ellipse 38% 20% at 25% 85%, rgba(145,170,160,0.28), transparent 70%); animation: fogDriftB 52s ease-in-out infinite alternate; opacity: 0.45; }
+    #fog-bottom { position: fixed; left: 0; right: 0; bottom: 0; height: 38%; pointer-events: none; z-index: 4; background: linear-gradient(to top, rgba(120,145,138,0.30), rgba(120,145,138,0.10) 55%, transparent); animation: fogBreath 9s ease-in-out infinite; }
+    body.fog-danger .fog-layer { opacity: 0.8; filter: hue-rotate(-40deg) saturate(1.6); }
+    body.cinematic .fog-layer, body.cinematic #fog-bottom { opacity: 0.35; }
+    @keyframes fogDriftA { from { transform: translate3d(-5%, 0, 0) scale(1.05); } to { transform: translate3d(6%, -2%, 0) scale(1.15); } }
+    @keyframes fogDriftB { from { transform: translate3d(6%, 1%, 0) scale(1.12); } to { transform: translate3d(-7%, -1%, 0) scale(1.02); } }
+    @keyframes fogBreath { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
   </style>
 </head>
 <body class="menu-open">
   <canvas id="game-canvas"></canvas>
 
   <!-- Atmosphere & Jumpscare Overlays -->
+  <div id="fog-a" class="fog-layer"></div>
+  <div id="fog-b" class="fog-layer"></div>
+  <div id="fog-bottom"></div>
   <div id="vignette-layer"></div>
   <div id="damage-vignette"></div>
   <div id="curse-overlay"></div>
@@ -1901,43 +1915,49 @@
           else finishChapter2();
         }
       }
+function finishChapter2() {
+        if (state.isGameOver) return;
+        state.isGameOver = true;
+        state.isPlaying = false;
+        try { document.exitPointerLock?.(); } catch (_) {}
 
-     function finishChapter2() {
-  if (state.isGameOver) return;
-  state.isGameOver = true;
-  state.isPlaying = false;
-  try { document.exitPointerLock?.(); } catch (_) {}
+        const titleEl = document.getElementById('end-title');
+        const subEl = document.getElementById('end-sub');
+        const q = document.getElementById('end-quote');
+        const endScreen = document.getElementById('end-screen');
+        const restartBtn = document.getElementById('end-restart-btn');
 
-  // I-save ang status ni Elias para madala sa Chapter 3
-  try {
-    localStorage.setItem('kasuma_carryover', JSON.stringify({
-      hp: state.hp ?? 100,
-      battery: state.battery ?? 100,
-      difficulty: typeof diffId !== 'undefined' ? diffId : 'normal',
-      weapons: state.weapons ?? [],
-      completedChapter: 2
-    }));
-  } catch (_) {}
+        if (titleEl) {
+          titleEl.textContent = 'NAKALABAS SA GUBAT';
+          titleEl.style.color = '#e5c37a';
+        }
+        if (subEl) {
+          subEl.textContent = 'Nakaligtas si Elias sa Gubat na Bumubulong, ngunit sa dilim ng bundok ay maririnig pa rin ang mga yapak ng Higanteng Kapre...';
+        }
+        if (q) {
+          q.style.display = 'block';
+          q.textContent = '"Kapag tinawag ang pangalan mo sa gubat, huwag kang lilingon."';
+        }
+        if (endScreen) {
+          endScreen.classList.remove('hidden');
+        }
 
-  document.getElementById('end-title').textContent = 'NAKALABAS SA GUBAT';
-  document.getElementById('end-title').style.color = '#e5c37a';
-  document.getElementById('end-sub').textContent = 'Nakaligtas si Elias sa Gubat na Bumubulong, ngunit sa dilim ng bundok ay maririnig pa rin ang mga yapak ng Higanteng Kapre...';
-
-  const q = document.getElementById('end-quote');
-  q.style.display = 'block';
-  q.textContent = '"Kapag tinawag ang pangalan mo sa gubat, huwag kang lilingon."';
-
-  // I-connect ang button sa Chapter 3
-  const btn = document.getElementById('end-restart-btn');
-  if (btn) {
-    btn.textContent = 'MAGPATULOY SA CHAPTER 3 →';
-    btn.onclick = () => {
-      window.location.href = 'KasumaChapterlll.html';
-    };
-  }
-
-  document.getElementById('end-screen').classList.remove('hidden');
-}
+        const nextChapterUrl = 'KasumaChapterIII.html';
+        let goingNext = false;
+        const goNext = () => {
+          if (goingNext) return;
+          goingNext = true;
+          console.log('[KASÚMA] Going to:', nextChapterUrl);
+          try { (window.top || window).location.href = nextChapterUrl; }
+          catch (_) { window.location.href = nextChapterUrl; }
+        };
+        if (restartBtn) {
+          restartBtn.textContent = 'TULOY SA CHAPTER 3';
+          restartBtn.dataset.next = '1';
+          restartBtn.onclick = goNext;
+        }
+        setTimeout(goNext, 2500);
+      }
 
       const keys = {}; let isDraggingLook = false, prevX = 0, prevY = 0; const joyInput = { x: 0, y: 0 };
       function onKeyDown(e) {
@@ -2094,6 +2114,52 @@
         ffGeo.attributes.position.needsUpdate = true;
       }
 
+      /* ---------------- FOG EFFECTS (3D mist + dynamic density) ---------------- */
+      const FOG_BASE = 0.034;
+      const fogTex = (() => {
+        const c = document.createElement('canvas'); c.width = c.height = 128;
+        const x = c.getContext('2d');
+        const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+        g.addColorStop(0, 'rgba(190,210,200,0.55)'); g.addColorStop(0.5, 'rgba(160,185,175,0.22)'); g.addColorStop(1, 'rgba(140,165,155,0)');
+        x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+        return new THREE.CanvasTexture(c);
+      })();
+      const mistCount = 46, mistSprites = [];
+      for (let i = 0; i < mistCount; i++) {
+        const mat = new THREE.SpriteMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: 0.16 + Math.random() * 0.12, fog: false, color: 0xb4c8be });
+        const sp = new THREE.Sprite(mat);
+        const sz = 9 + Math.random() * 12;
+        sp.scale.set(sz, sz * 0.38, 1);
+        sp.position.set((Math.random() - 0.5) * 70, 0.5 + Math.random() * 1.6, -62 + Math.random() * 120);
+        sp.userData = { vx: (Math.random() - 0.3) * 0.5, base: sp.position.y, ph: Math.random() * 6.28, op: mat.opacity };
+        scene.add(sp); mistSprites.push(sp);
+      }
+      const fogBody = document.body;
+      let fogPulseT = 8 + Math.random() * 10, fogPulse = 0;
+      function updateFog(t, dt) {
+        // ulap sa lupa: dahan-dahang lumilipat
+        mistSprites.forEach(sp => {
+          const u = sp.userData;
+          sp.position.x += u.vx * dt;
+          sp.position.y = u.base + Math.sin(t * 0.4 + u.ph) * 0.25;
+          if (sp.position.x > 38) sp.position.x = -38; else if (sp.position.x < -38) sp.position.x = 38;
+          sp.material.opacity = u.op * (0.8 + Math.sin(t * 0.3 + u.ph) * 0.2) * (1 + fogPulse * 0.8);
+        });
+        // biglaang kapal ng hamog paminsan-minsan
+        fogPulseT -= dt;
+        if (fogPulseT <= 0) { fogPulse = 1; fogPulseT = 14 + Math.random() * 14; }
+        fogPulse = Math.max(0, fogPulse - dt * 0.12);
+        const bump = Math.sin(Math.min(1, fogPulse) * Math.PI);
+        if (state.blackout > 0) return;
+        // hininga ng hamog + lumalapot kapag malapit ang Kapre
+        const dK = Math.hypot(state.pos.x - kapreGroup.position.x, state.pos.z - kapreGroup.position.z);
+        const near = kapreAI.state === 'PERCHED' ? 0 : THREE.MathUtils.clamp(1 - dK / 22, 0, 1);
+        const breath = Math.sin(t * 0.35) * 0.004 + Math.sin(t * 0.13) * 0.003;
+        const chase = state.finalChase ? 0.012 : 0;
+        scene.fog.density = FOG_BASE + breath + near * 0.016 + bump * 0.01 + chase;
+        fogBody.classList.toggle('fog-danger', !!state.finalChase || kapreAI.state === 'CHASE');
+      }
+
       /* ---------------- MISYON CHECKLIST ---------------- */
       const missionDone = {};
       let missionInit = false, missionHTML = '';
@@ -2142,6 +2208,7 @@
 
         swayFoliage.forEach(f => { f.mesh.rotation.z = Math.sin(elapsed * 1.5 + f.phase) * 0.05; });
         updateFireflies(elapsed);
+        updateFog(elapsed, dt);
         interactables.forEach(it => { if (it.kind === 'weapon' && it.mesh) { if (it.baseY === undefined) it.baseY = it.mesh.position.y; it.mesh.position.y = it.baseY + Math.sin(elapsed * 2 + it.baseY * 5) * 0.07; } });
         if (state.jumpscareCooldown > 0) state.jumpscareCooldown -= dt;
         if (state.jumpscareTimer > 0) {
@@ -2366,7 +2433,7 @@
       animate();
 
       activeCleanup = () => {
-        cancelAnimationFrame(rafId);
+        cancelAnimationFrame(rafId); document.body.classList.remove('fog-danger');
         window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp);
         canvas.removeEventListener('mousedown', onMouseDown); document.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp);
       };
@@ -2382,7 +2449,10 @@
       document.body.classList.remove('menu-open'); launchChapter2(saved);
     });
     document.getElementById('restart-btn').addEventListener('click', () => window.location.reload());
-    document.getElementById('end-restart-btn').addEventListener('click', () => window.location.reload());
+    document.getElementById('end-restart-btn').addEventListener('click', (e) => {
+      if (e.currentTarget.dataset.next) return;
+      window.location.reload();
+    });
   })();
   </script>
 </body>
