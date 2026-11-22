@@ -695,6 +695,24 @@
         } catch (_) {}
       }
 
+      playNoiseBurst(dur = 0.5, vol = 0.45) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const len = Math.floor(this.ctx.sampleRate * dur);
+          const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+          const src = this.ctx.createBufferSource(); src.buffer = buf;
+          const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.7;
+          const g = this.ctx.createGain();
+          g.gain.setValueAtTime(vol, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+          src.connect(bp); bp.connect(g); g.connect(this.masterGain);
+          src.start(now); src.stop(now + dur + 0.02);
+        } catch (_) {}
+      }
+
       playCreatureScreech() {
         if (!this.isStarted || !this.ctx) return;
         try {
@@ -961,9 +979,14 @@
       const sEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), scareEyeMat);
       sEyeL.position.set(-0.1, 0.06, 0.27);
       const sEyeR = sEyeL.clone(); sEyeR.position.x = 0.1;
-      scarePropGroup.add(scareSkull, scareJaw, sEyeL, sEyeR);
+      // Mukha (litrato) na sumasalubong sa screen kapag may jumpscare
+      const scareFaceMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+      const scareFace = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), scareFaceMat);
+      scareFace.position.set(0, 0.02, 0.2); scareFace.renderOrder = 999; scareFace.visible = false;
+      scarePropGroup.add(scareSkull, scareJaw, sEyeL, sEyeR, scareFace);
       scarePropGroup.position.set(0, -0.05, -0.82);
       camera.add(scarePropGroup);
+      let malignoFaceTex = null, kapreFaceTex = null;
 
       const state = {
         isPlaying: true, isPaused: false, isCinematic: true, isNoteOpen: false, isGameOver: false,
@@ -980,7 +1003,8 @@
         equippedWeapon: savedState?.equippedWeapon ?? 'sulo',
         attackCooldown: 0, swingAnim: 0, insensoTimer: 0,
         sequence: 1, cluesFound: 0, hutEntered: false, anitoPuzzleSolved: false, kapreSpotted: false,
-        shake: 0, jumpscareTimer: 0, jumpscareCooldown: 6.0, ambientWhisperTimer: 6.5
+        shake: 0, jumpscareTimer: 0, jumpscareCooldown: 6.0, ambientWhisperTimer: 6.5,
+        blackoutT: 0, fovKick: 0, ambientScareTimer: 16.0, lastAmbient: -1
       };
 
       const SEQUENCES = {
@@ -1003,11 +1027,44 @@
         document.getElementById('objective-sub').textContent = DIFF.hint === 0 ? '' : s.sub;
       }
 
-      function triggerJumpscare(kind = 'maligno', hpDamage = 14, message = '') {
-        if (state.isGameOver || state.isPaused || state.isCinematic) return;
-        if (state.jumpscareCooldown > 0 && kind !== 'lethal') return;
+      function getScareTex(kind) {
+        try {
+          if (kind === 'kapre') {
+            if (!kapreFaceTex) {
+              const src = kHead.children.find(c => c.material && c.material.map);
+              if (src) {
+                kapreFaceTex = src.material.map.clone();
+                kapreFaceTex.repeat.set(0.5988, 0.3346); kapreFaceTex.offset.set(0.1796, 0.4613);
+                kapreFaceTex.needsUpdate = true;
+              }
+            }
+            return kapreFaceTex;
+          }
+          return malignoFaceTex;
+        } catch (_) { return null; }
+      }
 
-        state.jumpscareCooldown = 7.0;
+      function applyScareVisual(kind) {
+        try {
+          const tex = getScareTex(kind);
+          const showFace = !!tex;
+          scareSkull.visible = scareJaw.visible = sEyeL.visible = sEyeR.visible = !showFace;
+          scareFace.visible = showFace;
+          if (showFace) {
+            scareFaceMat.map = tex; scareFaceMat.needsUpdate = true;
+            if (kind === 'kapre') scareFace.scale.set(0.62, 0.62, 1); else scareFace.scale.set(0.8, 0.92, 1);
+          }
+        } catch (_) {
+          scareSkull.visible = scareJaw.visible = sEyeL.visible = sEyeR.visible = true; scareFace.visible = false;
+        }
+      }
+
+      function triggerJumpscare(kind = 'maligno', hpDamage = 14, message = '', cd = 7.0, force = false) {
+        if (state.isGameOver || state.isPaused || state.isCinematic) return;
+        if (state.jumpscareCooldown > 0 && kind !== 'lethal' && !force) return;
+
+        state.jumpscareCooldown = cd;
+        state.fovKick = 1;
         state.jumpscareTimer = 0.65;
         state.shake = Math.max(state.shake, 0.9);
 
@@ -1020,20 +1077,24 @@
 
         const flash = document.getElementById('scare-flash');
         const dark = document.getElementById('scare-dark');
-        flash.style.opacity = '0.88';
-        dark.style.opacity = '0.75';
+        flash.style.opacity = '0.85';
+        dark.style.opacity = '0.2';
+        setTimeout(() => { flash.style.opacity = '0.16'; }, 90);
+        audio.playNoiseBurst(0.5, 0.45);
 
         if (kind === 'kapre') {
           audio.playHeavyThud(0, 0.05);
           audio.playJumpscareStinger();
           scarePropGroup.visible = true;
           scarePropGroup.scale.setScalar(1.45);
+          applyScareVisual('kapre');
           showToast(message || 'DUMAGUNDONG ANG HIGANTENG KAPRE!');
         } else {
           audio.playCreatureScreech();
           audio.playJumpscareStinger();
           scarePropGroup.visible = true;
           scarePropGroup.scale.setScalar(1.0);
+          applyScareVisual('maligno');
           showToast(message || 'SUMULPOT ANG MALIGNO SA DILIM!');
         }
 
@@ -1041,7 +1102,7 @@
           flash.style.opacity = '0';
           dark.style.opacity = '0';
           scarePropGroup.visible = false;
-        }, 460);
+        }, 640);
 
         if (state.hp <= 0 && !state.isGameOver) {
           state.isGameOver = true;
@@ -1344,6 +1405,122 @@
       spawnMaligno('mimic', -6.8, 26); spawnMaligno('mimic', 7.4, 8);
       spawnMaligno('stalker', -9.2, -6); spawnMaligno('stalker', 8.5, -20);
       spawnMaligno('guardian', -4.5, -42); spawnMaligno('guardian', 4.5, -44);
+      try { const fm = malignos[0].group.children.find(c => c.material && c.material.map); malignoFaceTex = fm ? fm.material.map : null; } catch (_) {}
+
+      /* ----------------------------------------------------------------------
+         DAGDAG NA JUMPSCARE: mga multo, blackout, yapak sa likod, at mga nakatakdang eksena
+         ---------------------------------------------------------------------- */
+      const fakeMalignos = [];
+      function aheadPos(dist, side = 0) {
+        const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw), rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw);
+        return { x: state.pos.x + fx * dist + rx * side, z: state.pos.z + fz * dist + rz * side };
+      }
+      function spawnFakeMaligno(x, z, mode, opts = {}) {
+        const g = new THREE.Group();
+        g.position.set(THREE.MathUtils.clamp(x, -36, 36), 0, THREE.MathUtils.clamp(z, -54, 54));
+        const h = 1.4;
+        const torso = new THREE.Mesh(new THREE.ConeGeometry(0.32, h, 7), new THREE.MeshStandardMaterial({ color: 0x161814 }));
+        torso.position.y = h * 0.5;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), new THREE.MeshStandardMaterial({ color: 0x0d0e0d, roughness: 1 }));
+        head.position.set(0, h + 0.1, 0);
+        g.add(torso, head);
+        if (malignoFaceTex) {
+          const face = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.57), new THREE.MeshBasicMaterial({ map: malignoFaceTex, transparent: true, depthWrite: false, toneMapped: false }));
+          face.position.set(0, h + 0.1, 0.19); g.add(face);
+        } else {
+          const eyeM = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
+          const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.038), eyeM); e1.position.set(-0.07, h + 0.14, 0.18);
+          const e2 = e1.clone(); e2.position.x = 0.07; g.add(e1, e2);
+        }
+        g.lookAt(state.pos.x, 0, state.pos.z);
+        scene.add(g);
+        fakeMalignos.push({ g, mode, t: 0, life: opts.life || 2.4, speed: opts.speed || 8, dmg: opts.dmg ?? 6, msg: opts.msg || '' });
+      }
+      function updateFakeMalignos(dt) {
+        for (let i = fakeMalignos.length - 1; i >= 0; i--) {
+          const f = fakeMalignos[i];
+          f.t += dt;
+          const toP = new THREE.Vector3().subVectors(state.pos, f.g.position); toP.y = 0;
+          const d = toP.length();
+          f.g.lookAt(state.pos.x, 0, state.pos.z);
+          if (f.mode === 'rush') {
+            if (d > 1.25) f.g.position.addScaledVector(toP.normalize(), f.speed * dt);
+            if (d <= 1.25 || f.t > 6) {
+              scene.remove(f.g); fakeMalignos.splice(i, 1);
+              if (d <= 1.25) triggerJumpscare('maligno', f.dmg, f.msg, 5.0, true);
+            }
+          } else if (f.t >= f.life || d < 3.0) { // nakatitig lang, saka biglang naglalaho
+            scene.remove(f.g); fakeMalignos.splice(i, 1);
+            audio.playWhisperSpatial(Math.random() > 0.5 ? 0.8 : -0.8, 0.7);
+          }
+        }
+      }
+
+      const AMBIENT_SCARES = [
+        function nakatitig() { // may nakatayong anino sa unahan na biglang mawawala
+          const p = aheadPos(9, (Math.random() - 0.5) * 6);
+          spawnFakeMaligno(p.x, p.z, 'watch', { life: 2.6 });
+          audio.playWhisperSpatial(Math.random() > 0.5 ? 0.7 : -0.7, 0.8);
+          showSubtitle('BOSES (?)', '"Elias... nakikita kita..."', '"Elias... I can see you..."', 3400);
+        },
+        function sumugod() { // sumusugod mula sa dilim
+          const p = aheadPos(12, (Math.random() - 0.5) * 5);
+          spawnFakeMaligno(p.x, p.z, 'rush', { speed: 8.5, dmg: 5, msg: 'Sumugod ang Maligno mula sa dilim!' });
+          audio.playCreatureScreech();
+        },
+        function biglangDilim() { // namamatay ang ilaw, tapos may sumusulpot
+          state.blackoutT = 2.4;
+          audio.playFlashlightClick(); audio.playWhisperSpatial(0, 0.7);
+          showToast('Biglang namatay ang ilaw!');
+        },
+        function yapakSaLikod() { // papalapit na yapak sa likod mo, pero walang tao
+          showToast('May yapak sa likod mo...');
+          [0.9, 0.75, 0.6, 0.45, 0.3, 0.15].forEach((r, i) => setTimeout(() => { if (!state.isGameOver) audio.playHeavyThud(0, r); }, i * 330));
+          setTimeout(() => { if (!state.isGameOver && !state.isPaused) triggerJumpscare('maligno', 0, 'Walang tao sa likod mo... pero may bumulong sa tenga mo!', 5.0, true); }, 2100);
+        },
+        function bumagsakNaSanga() { // malakas na kaluskos at bagsak ng sanga sa tabi
+          const pan = Math.random() > 0.5 ? 0.9 : -0.9;
+          [0, 140, 300].forEach(ms => setTimeout(() => audio.playBranchSnap(pan), ms));
+          setTimeout(() => { audio.playHeavyThud(pan, 0.1); state.shake = Math.max(state.shake, 0.6); showToast('May bumagsak na malaking sanga sa tabi mo!'); }, 480);
+        },
+        function sigawNiMateo() { // gaya-gayang sigaw ni Mateo, saka susugod
+          audio.playWhisperSpatial(0.9, 1.4); audio.playCreatureScreech();
+          showSubtitle('BOSES NI MATEO (?)', '"ELIAS!! TUMAKBO KA!! NASA LIKOD MO SIYA!!"', '"ELIAS!! RUN!! HE\'S BEHIND YOU!!"', 3600);
+          setTimeout(() => {
+            const p = aheadPos(11, (Math.random() - 0.5) * 5);
+            spawnFakeMaligno(p.x, p.z, 'rush', { speed: 9.5, dmg: 6, msg: 'Sinunggaban ka ng Maligno na gumagaya kay Mateo!' });
+          }, 1400);
+        },
+        function atungalNgKapre() { // malayong atungal at yanig ng lupa
+          audio.playCreatureScreech(); audio.playHeavyThud(-0.6, 0.1);
+          setTimeout(() => audio.playHeavyThud(0.6, 0.15), 380);
+          state.shake = Math.max(state.shake, 0.8);
+          showToast('Umalingawngaw ang atungal ng Higanteng Kapre sa malayo!');
+        }
+      ];
+      const KAPRE_ROAR_IDX = AMBIENT_SCARES.length - 1;
+      function pickAmbientScare() {
+        const pool = [];
+        for (let i = 0; i < AMBIENT_SCARES.length; i++) {
+          if (i === state.lastAmbient) continue;
+          if (i === KAPRE_ROAR_IDX && !state.kapreSpotted) continue;
+          pool.push(i);
+        }
+        const idx = pool[Math.floor(Math.random() * pool.length)];
+        state.lastAmbient = idx; AMBIENT_SCARES[idx]();
+      }
+
+      // Mga nakatakdang jumpscare habang tumatawid sa daan (paunti-unti ang pinsala)
+      const trailScares = [
+        { z: 47,  done: false, fn: () => AMBIENT_SCARES[0]() },
+        { z: 38,  done: false, fn: () => triggerJumpscare('maligno', 5, 'Biglang sumilip ang Maligno sa likod ng Balete!', 6.0) },
+        { z: 28,  done: false, fn: () => AMBIENT_SCARES[5]() },
+        { z: 12,  done: false, fn: () => AMBIENT_SCARES[2]() },
+        { z: -6,  done: false, fn: () => AMBIENT_SCARES[1]() },
+        { z: -16, done: false, fn: () => AMBIENT_SCARES[3]() },
+        { z: -30, done: false, fn: () => AMBIENT_SCARES[6]() },
+        { z: -46, done: false, fn: () => triggerJumpscare('kapre', 8, 'Sumulpot ang Higanteng Kapre sa tapat ng Selyo!', 7.0) }
+      ];
 
       function triggerMimicWhisperEvent() {
         const lines = [
@@ -1580,6 +1757,10 @@
           state.jumpscareTimer -= dt;
           scarePropGroup.position.z = -0.82 + Math.sin(elapsed * 45) * 0.08;
         }
+        if (state.fovKick > 0) {
+          state.fovKick = Math.max(0, state.fovKick - dt * 3.2);
+          camera.fov = 68 + state.fovKick * 16; camera.updateProjectionMatrix();
+        } else if (camera.fov !== 68) { camera.fov = 68; camera.updateProjectionMatrix(); }
 
         if (state.isPlaying && !state.isPaused && !state.isGameOver) {
           if (state.isCinematic) {
@@ -1621,6 +1802,18 @@
               }
             });
 
+            // mga nakatakdang jumpscare sa daan
+            trailScares.forEach(ts => {
+              if (!ts.done && state.pos.z < ts.z && state.jumpscareCooldown <= 0 && state.blackoutT <= 0 && fakeMalignos.length === 0) { ts.done = true; ts.fn(); }
+            });
+            // random na jumpscare paminsan-minsan
+            state.ambientScareTimer -= dt;
+            if (state.ambientScareTimer <= 0 && state.sequence >= 2 && state.jumpscareCooldown <= 0 && state.blackoutT <= 0 && fakeMalignos.length === 0) {
+              pickAmbientScare();
+              const rg = diffId === 'easy' ? [38, 58] : diffId === 'expert' ? [14, 26] : [22, 38];
+              state.ambientScareTimer = rg[0] + Math.random() * (rg[1] - rg[0]);
+            }
+
             state.ambientWhisperTimer -= dt;
             if (state.ambientWhisperTimer <= 0) {
               state.ambientWhisperTimer = 10 + Math.random() * 8;
@@ -1635,9 +1828,23 @@
             if (state.anitoPuzzleSolved && state.pos.z < -54.5) finishChapter2();
           }
 
+          // mga multo at blackout
+          if (!state.isNoteOpen && !state.isCinematic) {
+            updateFakeMalignos(dt);
+            if (state.blackoutT > 0) {
+              state.blackoutT -= dt;
+              rig.suloHandLight.intensity = 0;
+              if (state.blackoutT <= 0) {
+                state.blackoutT = 0; equipWeapon(state.equippedWeapon);
+                audio.playFlashlightClick();
+                triggerJumpscare('maligno', 4, 'Pagbukas ng ilaw... nasa harap mo na ang Maligno!', 5.0, true);
+              }
+            }
+          }
+
           // Flashlight
-          rig.fpFlashlightBody.visible = state.flashlightOn && state.battery > 0;
-          if (state.flashlightOn && state.battery > 0) {
+          rig.fpFlashlightBody.visible = state.flashlightOn && state.battery > 0 && !(state.blackoutT > 0);
+          if (state.flashlightOn && state.battery > 0 && !(state.blackoutT > 0)) {
             state.battery = Math.max(0, state.battery - dt * DIFF.batt);
             flashlight.intensity = state.battery < 14 ? (Math.sin(elapsed * 32) > 0.35 ? 1.2 : 5.6) : 6.4;
             if (state.battery <= 0) { state.flashlightOn = false; flashlight.intensity = 0; showToast('Namatay ang plaslayt!'); }
