@@ -143,6 +143,12 @@
     #journal-list .j-item { border-left: 2px solid var(--accent-gold); padding-left: 10px; margin-bottom: 10px; }
     #journal-list .j-item b { color: var(--accent-gold); }
     #journal-list .j-empty { color: var(--text-muted); font-style: italic; margin-bottom: 10px; }
+    #mission-list { list-style: none; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 0.72rem; line-height: 1.55; }
+    #mission-list li { color: var(--text-muted); }
+    #mission-list li.done { color: #7ed99c; text-decoration: line-through; opacity: 0.7; }
+    #mission-list li.next { color: #fff; font-weight: 600; }
+    #mission-list li.opt::after { content: ' (opsyonal)'; font-size: 0.62rem; opacity: 0.7; }
+    #mission-list .dist { color: var(--accent-gold); margin-left: 4px; }
   </style>
 </head>
 <body class="menu-open">
@@ -180,6 +186,7 @@
       <div id="objective-label">YUGTO 1 • PAGPASOK SA GUBAT</div>
       <div id="objective-text">Maglakad papasok sa madilim na gubat</div>
       <div id="objective-sub">Sundan ang maputik na landas at mag-ingat sa mga bumubulong.</div>
+      <ul id="mission-list"></ul>
     </div>
 
     <div id="top-right-hud">
@@ -286,6 +293,9 @@
       <p style="font-size: 0.92rem; line-height: 1.65; color: #fff;">
         Matapos makatakas sa madugong handaan sa baryo, pumasok si <strong>Elias</strong> sa madilim at masukal na kagubatan. Sa likod ng mga higanteng puno ng Balete nagkukubli ang <strong style="color:#ff4545;">Higanteng Kapre</strong> at mga <strong style="color:#ff4545;">Maligno</strong> na nanggagaya ng boses sa dilim.
       </p>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.14); font-size:0.82rem; line-height:1.6; color:#fff;">
+        <strong style="color:#e07a22; letter-spacing:0.15em;">MISYON:</strong> Makalabas nang buhay sa gubat. Hanapin ang <strong>3 pahiwatig</strong> tungkol kay Mateo, ang <strong>kubo</strong> ng bantay-gubat para sa kodigo ng <strong>Selyo ng Anito</strong>, at buksan ang selyo sa dulo (timog-dulong bahagi ng mapa). Kumuha ng sandata sa daan, magtago [C] sa Kapre, at huwag maniwala sa boses ni Mateo.
+      </div>
       <div class="controls-grid">
         <span><strong>WASD</strong> — Maglakad</span>
         <span><strong>MOUSE / DRAG</strong> — Lumingon</span>
@@ -695,24 +705,6 @@
         } catch (_) {}
       }
 
-      playNoiseBurst(dur = 0.5, vol = 0.45) {
-        if (!this.isStarted || !this.ctx) return;
-        try {
-          const now = this.ctx.currentTime;
-          const len = Math.floor(this.ctx.sampleRate * dur);
-          const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-          const d = buf.getChannelData(0);
-          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-          const src = this.ctx.createBufferSource(); src.buffer = buf;
-          const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.7;
-          const g = this.ctx.createGain();
-          g.gain.setValueAtTime(vol, now);
-          g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-          src.connect(bp); bp.connect(g); g.connect(this.masterGain);
-          src.start(now); src.stop(now + dur + 0.02);
-        } catch (_) {}
-      }
-
       playCreatureScreech() {
         if (!this.isStarted || !this.ctx) return;
         try {
@@ -851,10 +843,21 @@
         agimat: createWeapon3DModel('agimat'),
         insenso: createWeapon3DModel('insenso')
       };
-      Object.values(fpWeapons).forEach(w => {
-        w.visible = false; w.scale.setScalar(0.72);
-        w.position.set(0, 0.02, -0.18); w.rotation.set(Math.PI / 2.6, 0, 0);
-        rightArmRig.handGroup.add(w);
+      // gy = grip point sa model, rx = pagkiling (negatibo = nakaturo palayo sa player)
+      const GRIP = {
+        sulo:        { gy: -0.28, rx: -0.85, rz: 0.10, s: 0.72 },
+        buntot_pagi: { gy: -0.05, rx: -1.05, rz: 0.12, s: 0.80 },
+        itak:        { gy: -0.05, rx: -1.15, rz: 0.15, s: 0.80 },
+        agimat:      { gy: 0.0,   rx: -0.25, rz: 0,    s: 1.60 },
+        insenso:     { gy: 0.0,   rx: -0.10, rz: 0,    s: 1.50 }
+      };
+      Object.keys(fpWeapons).forEach(k => {
+        const m = fpWeapons[k], c = GRIP[k], holder = new THREE.Group();
+        m.position.y = -c.gy; holder.add(m);
+        holder.visible = false; holder.scale.setScalar(c.s);
+        holder.position.set(0, 0.03, -0.06); holder.rotation.set(c.rx, 0, c.rz);
+        rightArmRig.handGroup.add(holder);
+        fpWeapons[k] = holder;
       });
 
       const suloHandLight = new THREE.PointLight(0xff7b1c, 0, 15, 1.4);
@@ -979,14 +982,9 @@
       const sEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), scareEyeMat);
       sEyeL.position.set(-0.1, 0.06, 0.27);
       const sEyeR = sEyeL.clone(); sEyeR.position.x = 0.1;
-      // Mukha (litrato) na sumasalubong sa screen kapag may jumpscare
-      const scareFaceMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
-      const scareFace = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), scareFaceMat);
-      scareFace.position.set(0, 0.02, 0.2); scareFace.renderOrder = 999; scareFace.visible = false;
-      scarePropGroup.add(scareSkull, scareJaw, sEyeL, sEyeR, scareFace);
+      scarePropGroup.add(scareSkull, scareJaw, sEyeL, sEyeR);
       scarePropGroup.position.set(0, -0.05, -0.82);
       camera.add(scarePropGroup);
-      let malignoFaceTex = null, kapreFaceTex = null;
 
       const state = {
         isPlaying: true, isPaused: false, isCinematic: true, isNoteOpen: false, isGameOver: false,
@@ -1003,8 +1001,7 @@
         equippedWeapon: savedState?.equippedWeapon ?? 'sulo',
         attackCooldown: 0, swingAnim: 0, insensoTimer: 0,
         sequence: 1, cluesFound: 0, hutEntered: false, anitoPuzzleSolved: false, kapreSpotted: false,
-        shake: 0, jumpscareTimer: 0, jumpscareCooldown: 6.0, ambientWhisperTimer: 6.5,
-        blackoutT: 0, fovKick: 0, ambientScareTimer: 16.0, lastAmbient: -1
+        shake: 0, jumpscareTimer: 0, jumpscareCooldown: 6.0, ambientWhisperTimer: 6.5
       };
 
       const SEQUENCES = {
@@ -1014,7 +1011,7 @@
         4: { label: 'YUGTO 4 • ANG ANINO SA PUNO', title: 'Iwasan ang Higanteng Kapre at mga Maligno', sub: 'Yumuko [C] sa damuhan/ugat ng Balete at patayin ang ilaw [F] kapag papalapit siya.' },
         5: { label: 'YUGTO 5 • ANG INIWANG SILUNGAN', title: 'Suriin ang lumang kubo at basahin ang talaarawan (1998)', sub: 'Alamin ang kodigo ng Selyo ng Anito at kumuha ng gamit.' },
         6: { label: 'YUGTO 6 • ANG LIHIM NG GUBAT', title: 'Buksan ang Selyo ng Anito sa dulo ng gubat (9 - 8 - 4)', sub: 'Gamitin ang [E] sa Selyo ng Anito upang makalabas.' },
-        7: { label: 'YUGTO 7 • ANG HULING BABALA', title: 'Tumakbo palabas sa lihim na lagusan ng bundok', sub: 'Huwag nang lumingon—paparating na ang dilim!' }
+        7: { label: 'YUGTO 7 • ANG HULING BABALA', title: 'TAKBO! Tumakbo palabas sa lagusan ng bundok', sub: 'Hinahabol ka ng Kapre! Gamitin ang Agimat [4] o Insenso [5] kung maabutan ka.' }
       };
 
       function setSequence(seq) {
@@ -1027,44 +1024,11 @@
         document.getElementById('objective-sub').textContent = DIFF.hint === 0 ? '' : s.sub;
       }
 
-      function getScareTex(kind) {
-        try {
-          if (kind === 'kapre') {
-            if (!kapreFaceTex) {
-              const src = kHead.children.find(c => c.material && c.material.map);
-              if (src) {
-                kapreFaceTex = src.material.map.clone();
-                kapreFaceTex.repeat.set(0.5988, 0.3346); kapreFaceTex.offset.set(0.1796, 0.4613);
-                kapreFaceTex.needsUpdate = true;
-              }
-            }
-            return kapreFaceTex;
-          }
-          return malignoFaceTex;
-        } catch (_) { return null; }
-      }
-
-      function applyScareVisual(kind) {
-        try {
-          const tex = getScareTex(kind);
-          const showFace = !!tex;
-          scareSkull.visible = scareJaw.visible = sEyeL.visible = sEyeR.visible = !showFace;
-          scareFace.visible = showFace;
-          if (showFace) {
-            scareFaceMat.map = tex; scareFaceMat.needsUpdate = true;
-            if (kind === 'kapre') scareFace.scale.set(0.62, 0.62, 1); else scareFace.scale.set(0.8, 0.92, 1);
-          }
-        } catch (_) {
-          scareSkull.visible = scareJaw.visible = sEyeL.visible = sEyeR.visible = true; scareFace.visible = false;
-        }
-      }
-
-      function triggerJumpscare(kind = 'maligno', hpDamage = 14, message = '', cd = 7.0, force = false) {
+      function triggerJumpscare(kind = 'maligno', hpDamage = 14, message = '') {
         if (state.isGameOver || state.isPaused || state.isCinematic) return;
-        if (state.jumpscareCooldown > 0 && kind !== 'lethal' && !force) return;
+        if (state.jumpscareCooldown > 0 && kind !== 'lethal') return;
 
-        state.jumpscareCooldown = cd;
-        state.fovKick = 1;
+        state.jumpscareCooldown = 7.0;
         state.jumpscareTimer = 0.65;
         state.shake = Math.max(state.shake, 0.9);
 
@@ -1077,24 +1041,20 @@
 
         const flash = document.getElementById('scare-flash');
         const dark = document.getElementById('scare-dark');
-        flash.style.opacity = '0.85';
-        dark.style.opacity = '0.2';
-        setTimeout(() => { flash.style.opacity = '0.16'; }, 90);
-        audio.playNoiseBurst(0.5, 0.45);
+        flash.style.opacity = '0.88';
+        dark.style.opacity = '0.75';
 
         if (kind === 'kapre') {
           audio.playHeavyThud(0, 0.05);
           audio.playJumpscareStinger();
           scarePropGroup.visible = true;
           scarePropGroup.scale.setScalar(1.45);
-          applyScareVisual('kapre');
           showToast(message || 'DUMAGUNDONG ANG HIGANTENG KAPRE!');
         } else {
           audio.playCreatureScreech();
           audio.playJumpscareStinger();
           scarePropGroup.visible = true;
           scarePropGroup.scale.setScalar(1.0);
-          applyScareVisual('maligno');
           showToast(message || 'SUMULPOT ANG MALIGNO SA DILIM!');
         }
 
@@ -1102,7 +1062,7 @@
           flash.style.opacity = '0';
           dark.style.opacity = '0';
           scarePropGroup.visible = false;
-        }, 640);
+        }, 460);
 
         if (state.hp <= 0 && !state.isGameOver) {
           state.isGameOver = true;
@@ -1277,8 +1237,7 @@
         noteData: { id: 'diary98', title: 'Talaarawan ng Bantay-Gubat (1998)', body: '"Ang Higanteng Kapre ang nagbabantay sa lagusan palabas ng gubat. Ang tatlong sagradong bilang ng Selyo ng Anito ay 9 - 8 - 4. Gamitin ang Insenso [5] kung hinahabol ka."', trans: 'Anito Seal Code: 9 - 8 - 4. Use Incense [5] when chased.' },
         pos: diaryMesh.position, radius: 2.6, prompt: 'Basahin ang Talaarawan (1998)',
         onRead: () => {
-          state.cluesFound = Math.min(3, state.cluesFound + 1);
-          document.getElementById('clue-counter').textContent = `PAHIWATIG: ${state.cluesFound} / 3`;
+          if (!state.diaryRead) { state.diaryRead = true; addClue(); ambushHut(); }
           if (state.sequence < 6) setSequence(6);
         }
       });
@@ -1324,59 +1283,6 @@
         const patch = new THREE.Mesh(g0, new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0x666666, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
         patch.scale.setScalar(1.01); kHead.add(patch);
       })();
-      // ---- Buong katawan ng Higanteng Kapre: leeg, balikat, braso, balakang, binti at paa (nakatapak sa lupa) ----
-      const kapreRig = (function () {
-        const hairMat = new THREE.MeshStandardMaterial({ color: 0x0f0b09, roughness: 1 });
-        const clothMat = new THREE.MeshStandardMaterial({ color: 0x2a1d12, roughness: 0.95 });
-        const add = (m, x, y, z, parent) => { m.position.set(x, y, z); m.castShadow = true; (parent || kapreGroup).add(m); return m; };
-
-        // leeg at balikat (pinagdudugtong ang ulo at katawan)
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 0.5, 10), kSkin), 0, 3.6, 0.08);
-        add(new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 10), kSkin), -0.72, 3.36, 0);
-        add(new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 10), kSkin), 0.72, 3.36, 0);
-        // dibdib / tiyan (mas malapad ang katawan)
-        const chest = add(new THREE.Mesh(new THREE.SphereGeometry(0.72, 14, 12), kSkin), 0, 3.0, 0);
-        chest.scale.set(1.05, 0.8, 0.7);
-        // magaspang na buhok/balahibo sa likod ng ulo
-        add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), hairMat), 0, 4.0, -0.1);
-
-        // balakang at tela (bahag)
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.5, 10), kSkin), 0, 1.55, 0);
-        add(new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.72, 0.7, 10, 1, true), clothMat), 0, 1.35, 0).material.side = THREE.DoubleSide;
-
-        // braso (nakababa mula sa balikat, may siko at kamay)
-        function makeArm(side) {
-          const pivot = new THREE.Group(); pivot.position.set(side * 0.78, 3.3, 0); kapreGroup.add(pivot);
-          add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.17, 1.1, 8), kSkin), 0, -0.55, 0, pivot);
-          const elbow = new THREE.Group(); elbow.position.set(0, -1.1, 0); pivot.add(elbow);
-          add(new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 8), kSkin), 0, 0, 0, elbow);
-          add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 1.0, 8), kSkin), 0, -0.5, 0, elbow);
-          add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), kSkin), 0, -1.05, 0, elbow);
-          // kuko
-          for (let f = -1; f <= 1; f++) {
-            const claw = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.28, 5), hairMat);
-            claw.position.set(f * 0.07, -1.28, 0.03); claw.rotation.x = Math.PI; elbow.add(claw);
-          }
-          pivot.rotation.z = side * 0.12; elbow.rotation.x = -0.25;
-          return { pivot, elbow };
-        }
-        const armL = makeArm(-1), armR = makeArm(1);
-
-        // binti (balakang -> hita -> tuhod -> binti -> paa, abot sa lupa y = 0)
-        function makeLeg(side) {
-          const hip = new THREE.Group(); hip.position.set(side * 0.27, 1.62, 0); kapreGroup.add(hip);
-          add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.84, 9), kSkin), 0, -0.42, 0, hip);
-          const knee = new THREE.Group(); knee.position.set(0, -0.84, 0); hip.add(knee);
-          add(new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 8), kSkin), 0, 0, 0, knee);
-          add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.14, 0.8, 9), kSkin), 0, -0.4, 0, knee);
-          const foot = add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.58), kSkin), 0, -0.76, 0.12, knee);
-          add(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.06, 0.2), hairMat), 0, -0.74, 0.36, knee);
-          return { hip, knee, foot };
-        }
-        const legL = makeLeg(-1), legR = makeLeg(1);
-
-        return { armL, armR, legL, legR, walk: 0, prev: new THREE.Vector3(kapreGroup.position.x, 0, kapreGroup.position.z) };
-      })();
       scene.add(kapreGroup);
 
       const kapreWaypoints = [new THREE.Vector3(-8.4, 0, 6), new THREE.Vector3(7.5, 0, -2), new THREE.Vector3(-5.0, 0, -24), new THREE.Vector3(6.5, 0, -38), new THREE.Vector3(-2.5, 0, -45)];
@@ -1405,122 +1311,6 @@
       spawnMaligno('mimic', -6.8, 26); spawnMaligno('mimic', 7.4, 8);
       spawnMaligno('stalker', -9.2, -6); spawnMaligno('stalker', 8.5, -20);
       spawnMaligno('guardian', -4.5, -42); spawnMaligno('guardian', 4.5, -44);
-      try { const fm = malignos[0].group.children.find(c => c.material && c.material.map); malignoFaceTex = fm ? fm.material.map : null; } catch (_) {}
-
-      /* ----------------------------------------------------------------------
-         DAGDAG NA JUMPSCARE: mga multo, blackout, yapak sa likod, at mga nakatakdang eksena
-         ---------------------------------------------------------------------- */
-      const fakeMalignos = [];
-      function aheadPos(dist, side = 0) {
-        const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw), rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw);
-        return { x: state.pos.x + fx * dist + rx * side, z: state.pos.z + fz * dist + rz * side };
-      }
-      function spawnFakeMaligno(x, z, mode, opts = {}) {
-        const g = new THREE.Group();
-        g.position.set(THREE.MathUtils.clamp(x, -36, 36), 0, THREE.MathUtils.clamp(z, -54, 54));
-        const h = 1.4;
-        const torso = new THREE.Mesh(new THREE.ConeGeometry(0.32, h, 7), new THREE.MeshStandardMaterial({ color: 0x161814 }));
-        torso.position.y = h * 0.5;
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), new THREE.MeshStandardMaterial({ color: 0x0d0e0d, roughness: 1 }));
-        head.position.set(0, h + 0.1, 0);
-        g.add(torso, head);
-        if (malignoFaceTex) {
-          const face = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.57), new THREE.MeshBasicMaterial({ map: malignoFaceTex, transparent: true, depthWrite: false, toneMapped: false }));
-          face.position.set(0, h + 0.1, 0.19); g.add(face);
-        } else {
-          const eyeM = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
-          const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.038), eyeM); e1.position.set(-0.07, h + 0.14, 0.18);
-          const e2 = e1.clone(); e2.position.x = 0.07; g.add(e1, e2);
-        }
-        g.lookAt(state.pos.x, 0, state.pos.z);
-        scene.add(g);
-        fakeMalignos.push({ g, mode, t: 0, life: opts.life || 2.4, speed: opts.speed || 8, dmg: opts.dmg ?? 6, msg: opts.msg || '' });
-      }
-      function updateFakeMalignos(dt) {
-        for (let i = fakeMalignos.length - 1; i >= 0; i--) {
-          const f = fakeMalignos[i];
-          f.t += dt;
-          const toP = new THREE.Vector3().subVectors(state.pos, f.g.position); toP.y = 0;
-          const d = toP.length();
-          f.g.lookAt(state.pos.x, 0, state.pos.z);
-          if (f.mode === 'rush') {
-            if (d > 1.25) f.g.position.addScaledVector(toP.normalize(), f.speed * dt);
-            if (d <= 1.25 || f.t > 6) {
-              scene.remove(f.g); fakeMalignos.splice(i, 1);
-              if (d <= 1.25) triggerJumpscare('maligno', f.dmg, f.msg, 5.0, true);
-            }
-          } else if (f.t >= f.life || d < 3.0) { // nakatitig lang, saka biglang naglalaho
-            scene.remove(f.g); fakeMalignos.splice(i, 1);
-            audio.playWhisperSpatial(Math.random() > 0.5 ? 0.8 : -0.8, 0.7);
-          }
-        }
-      }
-
-      const AMBIENT_SCARES = [
-        function nakatitig() { // may nakatayong anino sa unahan na biglang mawawala
-          const p = aheadPos(9, (Math.random() - 0.5) * 6);
-          spawnFakeMaligno(p.x, p.z, 'watch', { life: 2.6 });
-          audio.playWhisperSpatial(Math.random() > 0.5 ? 0.7 : -0.7, 0.8);
-          showSubtitle('BOSES (?)', '"Elias... nakikita kita..."', '"Elias... I can see you..."', 3400);
-        },
-        function sumugod() { // sumusugod mula sa dilim
-          const p = aheadPos(12, (Math.random() - 0.5) * 5);
-          spawnFakeMaligno(p.x, p.z, 'rush', { speed: 8.5, dmg: 5, msg: 'Sumugod ang Maligno mula sa dilim!' });
-          audio.playCreatureScreech();
-        },
-        function biglangDilim() { // namamatay ang ilaw, tapos may sumusulpot
-          state.blackoutT = 2.4;
-          audio.playFlashlightClick(); audio.playWhisperSpatial(0, 0.7);
-          showToast('Biglang namatay ang ilaw!');
-        },
-        function yapakSaLikod() { // papalapit na yapak sa likod mo, pero walang tao
-          showToast('May yapak sa likod mo...');
-          [0.9, 0.75, 0.6, 0.45, 0.3, 0.15].forEach((r, i) => setTimeout(() => { if (!state.isGameOver) audio.playHeavyThud(0, r); }, i * 330));
-          setTimeout(() => { if (!state.isGameOver && !state.isPaused) triggerJumpscare('maligno', 0, 'Walang tao sa likod mo... pero may bumulong sa tenga mo!', 5.0, true); }, 2100);
-        },
-        function bumagsakNaSanga() { // malakas na kaluskos at bagsak ng sanga sa tabi
-          const pan = Math.random() > 0.5 ? 0.9 : -0.9;
-          [0, 140, 300].forEach(ms => setTimeout(() => audio.playBranchSnap(pan), ms));
-          setTimeout(() => { audio.playHeavyThud(pan, 0.1); state.shake = Math.max(state.shake, 0.6); showToast('May bumagsak na malaking sanga sa tabi mo!'); }, 480);
-        },
-        function sigawNiMateo() { // gaya-gayang sigaw ni Mateo, saka susugod
-          audio.playWhisperSpatial(0.9, 1.4); audio.playCreatureScreech();
-          showSubtitle('BOSES NI MATEO (?)', '"ELIAS!! TUMAKBO KA!! NASA LIKOD MO SIYA!!"', '"ELIAS!! RUN!! HE\'S BEHIND YOU!!"', 3600);
-          setTimeout(() => {
-            const p = aheadPos(11, (Math.random() - 0.5) * 5);
-            spawnFakeMaligno(p.x, p.z, 'rush', { speed: 9.5, dmg: 6, msg: 'Sinunggaban ka ng Maligno na gumagaya kay Mateo!' });
-          }, 1400);
-        },
-        function atungalNgKapre() { // malayong atungal at yanig ng lupa
-          audio.playCreatureScreech(); audio.playHeavyThud(-0.6, 0.1);
-          setTimeout(() => audio.playHeavyThud(0.6, 0.15), 380);
-          state.shake = Math.max(state.shake, 0.8);
-          showToast('Umalingawngaw ang atungal ng Higanteng Kapre sa malayo!');
-        }
-      ];
-      const KAPRE_ROAR_IDX = AMBIENT_SCARES.length - 1;
-      function pickAmbientScare() {
-        const pool = [];
-        for (let i = 0; i < AMBIENT_SCARES.length; i++) {
-          if (i === state.lastAmbient) continue;
-          if (i === KAPRE_ROAR_IDX && !state.kapreSpotted) continue;
-          pool.push(i);
-        }
-        const idx = pool[Math.floor(Math.random() * pool.length)];
-        state.lastAmbient = idx; AMBIENT_SCARES[idx]();
-      }
-
-      // Mga nakatakdang jumpscare habang tumatawid sa daan (paunti-unti ang pinsala)
-      const trailScares = [
-        { z: 47,  done: false, fn: () => AMBIENT_SCARES[0]() },
-        { z: 38,  done: false, fn: () => triggerJumpscare('maligno', 5, 'Biglang sumilip ang Maligno sa likod ng Balete!', 6.0) },
-        { z: 28,  done: false, fn: () => AMBIENT_SCARES[5]() },
-        { z: 12,  done: false, fn: () => AMBIENT_SCARES[2]() },
-        { z: -6,  done: false, fn: () => AMBIENT_SCARES[1]() },
-        { z: -16, done: false, fn: () => AMBIENT_SCARES[3]() },
-        { z: -30, done: false, fn: () => AMBIENT_SCARES[6]() },
-        { z: -46, done: false, fn: () => triggerJumpscare('kapre', 8, 'Sumulpot ang Higanteng Kapre sa tapat ng Selyo!', 7.0) }
-      ];
 
       function triggerMimicWhisperEvent() {
         const lines = [
@@ -1575,7 +1365,7 @@
             if (m.hp <= 0) {
               m.dying = 1; m.stun = 0;
               state.malignoKills = (state.malignoKills || 0) + 1;
-              showToast('Napatay mo ang Maligno! (' + state.malignoKills + ' / 6)');
+              showToast('Napatay mo ang Maligno! (' + state.malignoKills + ' napatay)');
             } else { m.stun = 3.0; m.lungeCooldown = 6.0; showToast('Tinamaan ang Maligno!'); }
           }
         });
@@ -1614,7 +1404,7 @@
           const idx = colliders.indexOf(sealCollider); if (idx > -1) colliders.splice(idx, 1);
           sealInteractable.prompt = 'Tumakbo Palabas sa Lagusan ng Bundok';
           showToast('Bumukas ang Selyo ng Anito! Tumakbo na palabas!');
-          setSequence(7);
+          setSequence(7); startFinalChase();
         } else {
           state.isNoteOpen = false;
           document.getElementById('code-modal').classList.remove('open');
@@ -1737,12 +1527,131 @@
         return hideZones.some(hz => Math.hypot(state.pos.x - hz.x, state.pos.z - hz.z) < hz.radius);
       }
 
+      /* ----------------------------------------------------------------------
+         MGA IDINAGDAG: pahiwatig, ambush, blackout, tree-fall, fireflies, final chase
+         ---------------------------------------------------------------------- */
+      function addClue() {
+        state.cluesFound = Math.min(3, state.cluesFound + 1);
+        document.getElementById('clue-counter').textContent = `PAHIWATIG: ${state.cluesFound} / 3`;
+        if (state.cluesFound === 3) {
+          state.hp = Math.min(100, state.hp + 30);
+          showToast('Buo na ang kuwento ni Mateo! +30% Kalusugan');
+          showSubtitle('ELIAS', '“Buhay ka pa, Mateo... Hahanapin kita.”', '“You’re still alive, Mateo... I will find you.”', 4500);
+        }
+      }
+
+      const clueItems = [];
+      function addClueItem(x, z, noteData, prompt) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.22), new THREE.MeshStandardMaterial({ color: 0xcfc3a1, emissive: 0x6b5a2a, roughness: 0.8 }));
+        m.position.set(x, 0.32, z); m.rotation.y = x; scene.add(m);
+        const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.3, 8), rootMat); stump.position.set(x, 0.15, z); scene.add(stump);
+        const it = { kind: 'note', noteData, pos: new THREE.Vector3(x, 0.5, z), radius: 2.6, prompt,
+          onRead: () => { if (!it.counted) { it.counted = true; addClue(); } } };
+        interactables.push(it); clueItems.push(it);
+      }
+      addClueItem(2.6, 9, { id: 'clue_panyo', title: 'Punit na Panyo ni Mateo', body: '“Duguan ang panyo. May sulat sa laylayan: ‘Elias, kung mabasa mo ito, huwag mo akong sundan sa gubat.’”', trans: 'A bloodstained cloth: “Elias, if you read this, do not follow me into the forest.”' }, 'Pulutin ang Punit na Panyo');
+      addClueItem(-3.4, -23, { id: 'clue_rosaryo', title: 'Basag na Rosaryo', body: '“Nakapulupot sa ugat ng Balete ang rosaryo ni Mateo. May bakas ng kuko sa lupa — kinaladkad siya papasok sa gubat.”', trans: 'Mateo’s rosary, caught in a Balete root. Claw marks drag deeper into the forest.' }, 'Suriin ang Basag na Rosaryo');
+      addClueItem(1.4, -37, { id: 'clue_sulat', title: 'Huling Sulat ni Mateo', body: '“Kung hindi ako makalabas, tandaan mo: ang boses na tumatawag sa pangalan mo ay hindi akin. Hihingi lang ako ng tulong kapag tahimik ang gubat.”', trans: 'If I don’t make it out: the voice calling your name is not mine. I only ask for help when the forest is silent.' }, 'Basahin ang Huling Sulat');
+
+      function ambushHut() {
+        showSubtitle('ELIAS', '“Nasa labas sila... napapaligiran ako!”', '“They’re outside... I’m surrounded!”', 4200);
+        showToast('Pagsalakay ng mga Maligno! Lumaban o gamitin ang Insenso [5]!');
+        audio.playWhisperSpatial(-0.9, 0.9); audio.playWhisperSpatial(0.9, 1.1);
+        spawnMaligno('stalker', hutX + 8, hutZ + 4); spawnMaligno('stalker', hutX - 3, hutZ + 9); spawnMaligno('mimic', hutX + 6, hutZ - 6);
+        state.shake = Math.max(state.shake, 0.5);
+      }
+
+      const beats = {};
+      function once(k, cond, fn) { if (!beats[k] && cond) { beats[k] = true; fn(); } }
+      function runStoryBeats() {
+        const z = state.pos.z;
+        once('b1', z < 30, () => {
+          audio.playWhisperSpatial(0.85, 1.0);
+          showSubtitle('ELIAS', '“Parang boses ni Mateo ang bumubulong... pero bakit sa likod ko?”', '“That sounded like Mateo... but why from behind me?”', 4500);
+        });
+        once('b2', z < 8, () => {
+          const log = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 9, 8), barkMat);
+          log.rotation.z = Math.PI / 2; log.position.set(0, 0.85, z + 9); scene.add(log);
+          audio.playHeavyThud(0.4, 0.05); state.shake = 1.0;
+          showToast('Bumagsak ang malaking puno sa likuran mo! Wala nang balikan.');
+        });
+        once('b3', z < -30, () => {
+          state.blackout = 7; state.shake = 0.6;
+          audio.playWhisperSpatial(-0.9, 0.8); audio.playWhisperSpatial(0.9, 1.2); audio.playCreatureScreech();
+          showSubtitle('ELIAS', '“Namatay ang ilaw! Huwag kang lilingon... huwag kang lilingon...”', '“The light died! Don’t turn around...”', 5000);
+          spawnMaligno('stalker', state.pos.x + 6, state.pos.z + 6); spawnMaligno('stalker', state.pos.x - 6, state.pos.z + 4);
+        });
+      }
+
+      // Lagusan (huling takbuhan) — mga haligi sa magkabilang gilid
+      const pillarMat = new THREE.MeshStandardMaterial({ map: textures.stone, roughness: 0.95 });
+      const runeMat = new THREE.MeshBasicMaterial({ color: 0xd94a1f });
+      for (let pz = -60; pz > -84; pz -= 4) [-4.6, 4.6].forEach(px => {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(0.9, 4.2, 0.9), pillarMat); p.position.set(px, 2.1, pz); scene.add(p);
+        const r = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.05), runeMat); r.position.set(px > 0 ? px - 0.48 : px + 0.48, 3.2, pz); r.rotation.y = Math.PI / 2; scene.add(r);
+      });
+
+      function startFinalChase() {
+        state.finalChase = true;
+        kapreAI.state = 'CHASE'; kapreAI.detectionMeter = 1;
+        kapreGroup.position.set(0, 0, state.pos.z + 18);
+        scene.fog.color.setHex(0x1c0a08); scene.background.setHex(0x1c0a08);
+        fireflies.material.color.setHex(0xff5a2a);
+        audio.playHeavyThud(0, 0.05); audio.playCreatureScreech(); state.shake = 1.3;
+        showSubtitle('ELIAS', '“Takbo! Huwag kang lilingon!”', '“Run! Don’t look back!”', 4000);
+        showToast('HULING HABULAN! [SHIFT] tumakbo • [4] Agimat o [5] Insenso para pigilan ang Kapre');
+      }
+
+      // Mga alitaptap sa gubat
+      const ffN = 70, ffGeo = new THREE.BufferGeometry(), ffPos = new Float32Array(ffN * 3), ffBase = [];
+      for (let i = 0; i < ffN; i++) ffBase.push([(Math.random() - 0.5) * 30, 0.6 + Math.random() * 2.6, -50 + Math.random() * 100, Math.random() * 6.28]);
+      ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPos, 3));
+      const fireflies = new THREE.Points(ffGeo, new THREE.PointsMaterial({ color: 0xb8ffc8, size: 0.13, transparent: true, opacity: 0.85, depthWrite: false }));
+      fireflies.frustumCulled = false; scene.add(fireflies);
+      function updateFireflies(t) {
+        for (let i = 0; i < ffN; i++) { const b = ffBase[i];
+          ffPos[i * 3] = b[0] + Math.sin(t * 0.6 + b[3]) * 0.8; ffPos[i * 3 + 1] = b[1] + Math.sin(t * 1.1 + b[3] * 2) * 0.35; ffPos[i * 3 + 2] = b[2] + Math.cos(t * 0.5 + b[3]) * 0.8; }
+        ffGeo.attributes.position.needsUpdate = true;
+      }
+
+      /* ---------------- MISYON CHECKLIST ---------------- */
+      const missionDone = {};
+      let missionInit = false, missionHTML = '';
+      const MISSIONS = [
+        { id: 'sign',  text: 'Basahin ang karatula sa pasukan', test: () => collectedDocs.some(d => d.id === 'sign1'), target: () => [-2.6, 39] },
+        { id: 'weap',  text: 'Kumuha ng sandata (Itak / Buntot Pagi)', test: () => state.ownedWeapons.itak || state.ownedWeapons.buntot_pagi, target: () => state.ownedWeapons.itak ? [2.4, 31] : [-3.2, 18] },
+        { id: 'agi',   text: 'Kunin ang Agimat sa dambana', test: () => state.ownedWeapons.agimat, target: () => [5.95, 14.45] },
+        { id: 'clues', text: () => `Hanapin ang pahiwatig ni Mateo (${state.cluesFound}/3)`, test: () => state.cluesFound >= 3, target: () => { const c = clueItems.filter(i => !i.counted).sort((a, b) => a.pos.distanceTo(state.pos) - b.pos.distanceTo(state.pos))[0]; return c ? [c.pos.x, c.pos.z] : null; } },
+        { id: 'diary', text: 'Hanapin ang kubo at basahin ang talaarawan', test: () => state.diaryRead, target: () => [hutX - 1.5, hutZ - 1.6] },
+        { id: 'inc',   text: 'Kunin ang Insenso sa kubo', opt: true, test: () => state.ownedWeapons.insenso, target: () => [hutX - 0.8, hutZ - 1.5] },
+        { id: 'seal',  text: 'Buksan ang Selyo ng Anito (9-8-4) sa dulo ng gubat', test: () => state.anitoPuzzleSolved, target: () => [0, -51.2] },
+        { id: 'run',   text: 'TAKBO palabas ng lagusan!', test: () => false, target: () => [0, -80] }
+      ];
+      function updateMissions() {
+        let nextFound = false, html = '';
+        MISSIONS.forEach(m => {
+          if (!missionDone[m.id] && m.test()) { missionDone[m.id] = true; if (missionInit) showToast('✔ Natapos: ' + (typeof m.text === 'function' ? m.text() : m.text).replace(/ \(\d\/3\)/, '')); }
+          const done = !!missionDone[m.id];
+          let cls = done ? 'done' : '', dist = '';
+          if (!done && !nextFound && !m.opt) {
+            nextFound = true; cls = 'next';
+            const t = m.target && m.target();
+            if (t && DIFF.hint > 0) dist = `<span class="dist">▸ ${Math.round(Math.hypot(t[0] - state.pos.x, t[1] - state.pos.z))}m</span>`;
+          }
+          if (m.opt) cls += ' opt';
+          html += `<li class="${cls}">${done ? '✔' : '○'} ${typeof m.text === 'function' ? m.text() : m.text}${dist}</li>`;
+        });
+        missionInit = true;
+        if (html !== missionHTML) { missionHTML = html; document.getElementById('mission-list').innerHTML = html; }
+      }
+
       // Intro Sequence
       setSequence(1);
       document.body.classList.add('cinematic');
       const banner = document.getElementById('chapter-banner'); banner.classList.add('visible');
       showSubtitle('ELIAS', '"Pumasok ako sa gubat upang makatakas... pero parang mas nakakatakot ang mga bumubulong sa dilim."', '"I entered the forest to escape... yet the whispers in the dark feel far more terrifying."', 5000);
       setTimeout(() => banner.classList.remove('visible'), 3600);
+      setTimeout(() => { if (!state.isGameOver) showSubtitle('ELIAS', '“Kailangan kong marating ang Selyo ng Anito sa dulo ng gubat. Hahanapin ko rin ang mga bakas ni Mateo habang naglalakad.”', '“I must reach the Anito Seal at the far end. I’ll look for Mateo’s traces along the way.”', 6500); }, 5600);
       setTimeout(() => { state.isCinematic = false; document.body.classList.remove('cinematic'); setSequence(2); }, 4600);
 
       let rafId = null; const clock = new THREE.Clock();
@@ -1752,15 +1661,13 @@
         const elapsed = clock.getElapsedTime();
 
         swayFoliage.forEach(f => { f.mesh.rotation.z = Math.sin(elapsed * 1.5 + f.phase) * 0.05; });
+        updateFireflies(elapsed);
+        interactables.forEach(it => { if (it.kind === 'weapon' && it.mesh) { if (it.baseY === undefined) it.baseY = it.mesh.position.y; it.mesh.position.y = it.baseY + Math.sin(elapsed * 2 + it.baseY * 5) * 0.07; } });
         if (state.jumpscareCooldown > 0) state.jumpscareCooldown -= dt;
         if (state.jumpscareTimer > 0) {
           state.jumpscareTimer -= dt;
           scarePropGroup.position.z = -0.82 + Math.sin(elapsed * 45) * 0.08;
         }
-        if (state.fovKick > 0) {
-          state.fovKick = Math.max(0, state.fovKick - dt * 3.2);
-          camera.fov = 68 + state.fovKick * 16; camera.updateProjectionMatrix();
-        } else if (camera.fov !== 68) { camera.fov = 68; camera.updateProjectionMatrix(); }
 
         if (state.isPlaying && !state.isPaused && !state.isGameOver) {
           if (state.isCinematic) {
@@ -1780,7 +1687,7 @@
             const rVec = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
             const mv = new THREE.Vector3().addScaledVector(fVec, moveForward * speed * dt).addScaledVector(rVec, moveRight * speed * dt);
 
-            const blocked = (nx, nz) => nx < -38 || nx > 38 || nz < -56 || nz > 56 || colliders.some(c => nx + 0.42 > c.minX && nx - 0.42 < c.maxX && nz + 0.42 > c.minZ && nz - 0.42 < c.maxZ);
+            const blocked = (nx, nz) => Math.abs(nx) > (state.finalChase ? 3.6 : 38) || nz < (state.finalChase ? -84 : -56) || nz > 56 || colliders.some(c => nx + 0.42 > c.minX && nx - 0.42 < c.maxX && nz + 0.42 > c.minZ && nz - 0.42 < c.maxZ);
             if (!blocked(state.pos.x + mv.x, state.pos.z)) state.pos.x += mv.x;
             if (!blocked(state.pos.x, state.pos.z + mv.z)) state.pos.z += mv.z;
             state.pos.y = THREE.MathUtils.lerp(state.pos.y, state.isCrouching ? 1.02 : 1.72, dt * 10);
@@ -1802,18 +1709,6 @@
               }
             });
 
-            // mga nakatakdang jumpscare sa daan
-            trailScares.forEach(ts => {
-              if (!ts.done && state.pos.z < ts.z && state.jumpscareCooldown <= 0 && state.blackoutT <= 0 && fakeMalignos.length === 0) { ts.done = true; ts.fn(); }
-            });
-            // random na jumpscare paminsan-minsan
-            state.ambientScareTimer -= dt;
-            if (state.ambientScareTimer <= 0 && state.sequence >= 2 && state.jumpscareCooldown <= 0 && state.blackoutT <= 0 && fakeMalignos.length === 0) {
-              pickAmbientScare();
-              const rg = diffId === 'easy' ? [38, 58] : diffId === 'expert' ? [14, 26] : [22, 38];
-              state.ambientScareTimer = rg[0] + Math.random() * (rg[1] - rg[0]);
-            }
-
             state.ambientWhisperTimer -= dt;
             if (state.ambientWhisperTimer <= 0) {
               state.ambientWhisperTimer = 10 + Math.random() * 8;
@@ -1825,30 +1720,18 @@
               state.hutEntered = true; setSequence(5);
               showSubtitle('ELIAS', '"Isang lumang kubo... Baka nandito ang kodigo para mabuksan ang lagusan."', '"An abandoned hut... The code might be inside."', 4500);
             }
-            if (state.anitoPuzzleSolved && state.pos.z < -54.5) finishChapter2();
-          }
-
-          // mga multo at blackout
-          if (!state.isNoteOpen && !state.isCinematic) {
-            updateFakeMalignos(dt);
-            if (state.blackoutT > 0) {
-              state.blackoutT -= dt;
-              rig.suloHandLight.intensity = 0;
-              if (state.blackoutT <= 0) {
-                state.blackoutT = 0; equipWeapon(state.equippedWeapon);
-                audio.playFlashlightClick();
-                triggerJumpscare('maligno', 4, 'Pagbukas ng ilaw... nasa harap mo na ang Maligno!', 5.0, true);
-              }
-            }
+            runStoryBeats();
+            if (state.anitoPuzzleSolved && state.pos.z < -80) finishChapter2();
           }
 
           // Flashlight
-          rig.fpFlashlightBody.visible = state.flashlightOn && state.battery > 0 && !(state.blackoutT > 0);
-          if (state.flashlightOn && state.battery > 0 && !(state.blackoutT > 0)) {
+          rig.fpFlashlightBody.visible = state.flashlightOn && state.battery > 0;
+          if (state.flashlightOn && state.battery > 0) {
             state.battery = Math.max(0, state.battery - dt * DIFF.batt);
             flashlight.intensity = state.battery < 14 ? (Math.sin(elapsed * 32) > 0.35 ? 1.2 : 5.6) : 6.4;
             if (state.battery <= 0) { state.flashlightOn = false; flashlight.intensity = 0; showToast('Namatay ang plaslayt!'); }
           } else flashlight.intensity = 0;
+          if (state.blackout > 0) { state.blackout -= dt; flashlight.intensity = 0; scene.fog.density = 0.062; if (state.blackout <= 0) { scene.fog.density = 0.034; showToast('Bumalik ang liwanag... pero nandiyan pa sila.'); } }
           flashlight.position.copy(camera.position);
           const lDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
           flashlightTarget.position.copy(camera.position).addScaledVector(lDir, 10);
@@ -1856,8 +1739,10 @@
           if (state.insensoTimer > 0) state.insensoTimer -= dt;
           if (state.attackCooldown > 0) state.attackCooldown -= dt;
           if (state.swingAnim > 0) state.swingAnim = Math.max(0, state.swingAnim - dt * 3.8);
-          const swingArc = Math.sin(state.swingAnim * Math.PI);
-          rig.rightArmRig.root.rotation.set(0.32 + swingArc * 1.0, -0.14 + swingArc * 0.4, 0.08 - swingArc * 0.5);
+          const st = 1 - state.swingAnim; let sw = 0;
+          if (state.swingAnim > 0) sw = st < 0.25 ? (st / 0.25) * 0.55 : st < 0.5 ? 0.55 - ((st - 0.25) / 0.25) * 1.5 : -0.95 * (1 - (st - 0.5) / 0.5);
+          rig.rightArmRig.root.rotation.set(0.32 + sw + Math.sin(elapsed * 1.6) * 0.012, -0.14 - sw * 0.3, 0.08 - sw * 0.25);
+          rig.rightArmRig.root.position.y = -0.35 + Math.sin(state.bobTimer) * 0.008;
 
           // Kapre AI
           const toPlayer = new THREE.Vector3().subVectors(state.pos, kapreGroup.position); toPlayer.y = 0;
@@ -1877,14 +1762,14 @@
               }
             }
           } else if (kapreAI.state === 'STUNNED') {
-            kapreAI.timer -= dt; if (kapreAI.timer <= 0) kapreAI.state = 'PATROL';
+            kapreAI.timer -= dt; if (kapreAI.timer <= 0) kapreAI.state = state.finalChase ? 'CHASE' : 'PATROL';
           } else if (kapreAI.state === 'FEAR') {
             kapreAI.fearT -= dt;
             const away = toPlayer.clone().negate().normalize();
             kapreGroup.position.addScaledVector(away, 3.6 * dt);
             kapreGroup.lookAt(kapreGroup.position.x + away.x, 0, kapreGroup.position.z + away.z);
             kHead.rotation.z = Math.sin(elapsed * 38) * 0.1;
-            if (kapreAI.fearT <= 0) { kapreAI.state = 'PATROL'; kHead.rotation.z = 0; }
+            if (kapreAI.fearT <= 0) { kapreAI.state = state.finalChase ? 'CHASE' : 'PATROL'; kHead.rotation.z = 0; }
           } else {
             const effRange = hidden ? 4.2 : (state.flashlightOn ? 18 : 9);
             if (distK < effRange && state.insensoTimer <= 0) {
@@ -1907,24 +1792,6 @@
               state.hp = Math.max(0, state.hp - dt * 30 * DIFF.dmg);
               if (state.jumpscareCooldown <= 0) triggerJumpscare('kapre', 15, 'Sinuntok ng Higanteng Kapre ang lupa!');
             }
-          }
-
-          // Animasyon ng paglalakad ng Higanteng Kapre (binti at braso)
-          {
-            const dx = kapreGroup.position.x - kapreRig.prev.x, dz = kapreGroup.position.z - kapreRig.prev.z;
-            const mvSpeed = dt > 0 ? Math.hypot(dx, dz) / dt : 0;
-            kapreRig.prev.set(kapreGroup.position.x, 0, kapreGroup.position.z);
-            const moving = THREE.MathUtils.clamp(mvSpeed / 2.0, 0, 1.6);
-            kapreRig.walk += dt * (2.2 + mvSpeed * 1.3);
-            const sw = Math.sin(kapreRig.walk) * 0.6 * Math.min(moving, 1.2);
-            kapreRig.legL.hip.rotation.x = sw;
-            kapreRig.legR.hip.rotation.x = -sw;
-            kapreRig.legL.knee.rotation.x = Math.max(0, -sw) * 0.9;
-            kapreRig.legR.knee.rotation.x = Math.max(0, sw) * 0.9;
-            kapreRig.armL.pivot.rotation.x = -sw * 0.7;
-            kapreRig.armR.pivot.rotation.x = sw * 0.7;
-            kapreRig.armL.elbow.rotation.x = -0.25 - Math.max(0, sw) * 0.4;
-            kapreRig.armR.elbow.rotation.x = -0.25 - Math.max(0, -sw) * 0.4;
           }
 
           // Maligno AI
@@ -1980,6 +1847,7 @@
             promptEl.classList.remove('visible');
           }
 
+          updateMissions();
           const threat = THREE.MathUtils.clamp(1 - distK / 24, 0, 1);
           audio.update(dt, threat, state.ownedWeapons.agimat);
           document.getElementById('hp-val').textContent = `${Math.ceil(state.hp)}%`;
