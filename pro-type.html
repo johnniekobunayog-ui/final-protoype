@@ -749,6 +749,7 @@
   <div id="curse-overlay"></div>
   <div id="anting-pulse"></div>
   <div id="scare-flash"></div>
+  <div id="scare-dark" style="position:fixed;inset:0;pointer-events:none;z-index:9;opacity:0;background:radial-gradient(circle at center, rgba(0,0,0,0.78) 0%, #000 75%);"></div>
   <div id="film-grain"></div>
 
   <div id="letterbox-top" class="letterbox"></div>
@@ -1248,6 +1249,104 @@
             g.connect(this.masterGain);
             src.start(now);
             src.stop(now + 0.9);
+          } catch (_) {}
+        }
+
+        playScareBuild(dur) {
+          if (!this.isStarted || !this.ctx) return;
+          try {
+            const now = this.ctx.currentTime;
+            // patayin ang ingay ng gabi — nakakakilabot na katahimikan
+            this.ambienceGain.gain.cancelScheduledValues(now);
+            this.ambienceGain.gain.setTargetAtTime(0.0001, now, 0.12);
+            const lp = this.ctx.createBiquadFilter();
+            lp.type = 'lowpass';
+            lp.frequency.value = 420;
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.linearRampToValueAtTime(0.22, now + dur * 0.92);
+            g.gain.setValueAtTime(0.0001, now + dur);
+            lp.connect(g);
+            g.connect(this.masterGain);
+            [[46, 190], [49, 203]].forEach(([f0, f1]) => {
+              const o = this.ctx.createOscillator();
+              o.type = 'sawtooth';
+              o.frequency.setValueAtTime(f0, now);
+              o.frequency.exponentialRampToValueAtTime(f1, now + dur);
+              o.connect(lp);
+              o.start(now);
+              o.stop(now + dur + 0.05);
+            });
+            for (let i = 0; i < 5; i++) {
+              setTimeout(() => this.playHeartbeat(0.55 + i * 0.1, false), i * (dur * 1000 / 5));
+            }
+          } catch (_) {}
+        }
+
+        playScareHit(strength = 1) {
+          if (!this.isStarted || !this.ctx) return;
+          try {
+            const now = this.ctx.currentTime;
+            // 1) pasabog na ingay
+            const len = Math.floor(this.ctx.sampleRate * 0.8);
+            const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+            const ns = this.ctx.createBufferSource();
+            ns.buffer = buf;
+            const hp = this.ctx.createBiquadFilter();
+            hp.type = 'highpass';
+            hp.frequency.value = 260;
+            const ng = this.ctx.createGain();
+            ng.gain.setValueAtTime(0.7 * strength, now);
+            ng.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+            ns.connect(hp); hp.connect(ng); ng.connect(this.masterGain);
+            ns.start(now);
+            // 2) mabigat na dagundong
+            const boom = this.ctx.createOscillator();
+            const bg = this.ctx.createGain();
+            boom.type = 'sine';
+            boom.frequency.setValueAtTime(78, now);
+            boom.frequency.exponentialRampToValueAtTime(21, now + 0.9);
+            bg.gain.setValueAtTime(0.85 * strength, now);
+            bg.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+            boom.connect(bg); bg.connect(this.masterGain);
+            boom.start(now); boom.stop(now + 1.05);
+            // 3) sirang, distorted na tili
+            const shaper = this.ctx.createWaveShaper();
+            const curve = new Float32Array(256);
+            for (let i = 0; i < 256; i++) {
+              const x = i * 2 / 256 - 1;
+              curve[i] = (3 + 60) * x * 20 * (Math.PI / 180) / (Math.PI + 60 * Math.abs(x));
+            }
+            shaper.curve = curve;
+            const sg = this.ctx.createGain();
+            sg.gain.setValueAtTime(0.2 * strength, now);
+            sg.gain.setValueAtTime(0.2 * strength, now + 0.5);
+            sg.gain.exponentialRampToValueAtTime(0.001, now + 1.25);
+            shaper.connect(sg); sg.connect(this.masterGain);
+            [820, 1180, 1630, 2310].forEach((f, i) => {
+              const o = this.ctx.createOscillator();
+              o.type = 'sawtooth';
+              o.detune.value = (i - 1.5) * 18;
+              o.frequency.setValueAtTime(f * 0.6, now);
+              o.frequency.exponentialRampToValueAtTime(f * 1.5, now + 0.12);
+              o.frequency.linearRampToValueAtTime(f * 1.15, now + 0.55);
+              o.frequency.exponentialRampToValueAtTime(f * 0.45, now + 1.2);
+              const lfo = this.ctx.createOscillator();
+              const lg = this.ctx.createGain();
+              lfo.frequency.value = 38 + i * 7;
+              lg.gain.value = f * 0.06;
+              lfo.connect(lg); lg.connect(o.frequency);
+              o.connect(shaper);
+              o.start(now); lfo.start(now);
+              o.stop(now + 1.3); lfo.stop(now + 1.3);
+            });
+            this.playJumpscareStinger();
+            // ibalik ang ingay ng gabi pagkatapos
+            this.ambienceGain.gain.cancelScheduledValues(now);
+            this.ambienceGain.gain.setTargetAtTime(0.0001, now, 0.02);
+            this.ambienceGain.gain.setTargetAtTime(0.24, now + 1.6, 0.6);
           } catch (_) {}
         }
 
@@ -2927,7 +3026,7 @@
         // Creature: expression follows AI state
         if (creatureGroup.visible) {
           const st = enemyAI.state;
-          const open = st === 'CHASE' ? 0.7 + 0.3 * Math.sin(t * 20) : st === 'STAGGER' ? 1 : st === 'STALK' ? 0.15 : 0.3;
+          const open = scareT > 0 ? 1 : st === 'CHASE' ? 0.7 + 0.3 * Math.sin(t * 20) : st === 'STAGGER' ? 1 : st === 'STALK' ? 0.15 : 0.3;
           updateFace(creatureFace, dt, t, { open, mood: st === 'STALK' ? 0.6 : 1 });
         }
       }
@@ -2944,35 +3043,128 @@
       };
 
       enemyAI.rage = 0; enemyAI.lungeT = 0; enemyAI.lungeCd = 1.5; enemyAI.nav = null;
+
+      /* ---- JUMPSCARE SYSTEM: pagdilim -> katahimikan -> biglang mukha ng aswang sa harap mo ---- */
+      let scareT = 0, scareDur = 1, scareStart = 1.5, ambushStage = 0, ambushT = 0, ambushFlashWas = true;
+      const scareDir = new THREE.Vector3(0, 0, -1);
+      const scareDark = document.getElementById('scare-dark');
+      const creatureGlow = new THREE.PointLight(0xff2a1a, 0, 9, 1.6);
+      creatureGlow.position.set(0, 2.0, 1.0);
+      creatureGroup.add(creatureGlow);
+
+      function jumpscarePop(dur) {
+        const fwd = new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+        let d = 1.0;
+        for (const dd of [1.6, 1.4, 1.2, 1.0]) {
+          if (!checkCollision(state.pos.x + fwd.x * dd, state.pos.z + fwd.z * dd)) { d = dd; break; }
+        }
+        creatureGroup.position.set(state.pos.x + fwd.x * d, 0, state.pos.z + fwd.z * d);
+        creatureGroup.visible = true;
+        creatureGroup.lookAt(state.pos.x, 0, state.pos.z);
+        enemyAI.active = true;
+        enemyAI.state = 'CHASE';
+        enemyAI.attackCooldown = 1.6;
+        enemyAI.nav = null;
+        enemyAI.lungeT = 0;
+        enemyAI.lungeCd = 3;
+        state.lookAway = 0;
+        state.behindCd = Math.max(state.behindCd, DIFF.behindCd);
+        scareT = scareDur = dur;
+        scareStart = d;
+        scareDir.copy(fwd);
+        audio.playScareHit(1);
+        const fl = document.getElementById('scare-flash');
+        [0, 120, 230].forEach((ms) => {
+          setTimeout(() => {
+            fl.style.transition = 'none';
+            fl.style.opacity = '0.85';
+            setTimeout(() => { fl.style.transition = 'opacity 0.12s'; fl.style.opacity = '0'; }, 50);
+          }, ms);
+        });
+        canvas.style.filter = 'contrast(1.45) saturate(1.5) brightness(1.1)';
+        try { if (navigator.vibrate) navigator.vibrate([220, 60, 160, 50, 300]); } catch (_) {}
+        document.getElementById('subtitle-box').classList.remove('visible');
+      }
+
+      function updateScare(dt) {
+        scareT -= dt;
+        const p = Math.min(1, 1 - scareT / scareDur);
+        const dist = scareStart - (scareStart - 0.7) * Math.min(1, p * 2.5); // biglang sugod sa mukha mo
+        const cp = creatureGroup.position;
+        cp.x = state.pos.x + scareDir.x * dist + (Math.random() - 0.5) * 0.035;
+        cp.z = state.pos.z + scareDir.z * dist + (Math.random() - 0.5) * 0.035;
+        creatureGroup.lookAt(state.pos.x, 0, state.pos.z);
+        const sh = 0.12 * (1 - p * 0.6);
+        camera.position.set(
+          state.pos.x + (Math.random() - 0.5) * sh,
+          state.pos.y + (Math.random() - 0.5) * sh,
+          state.pos.z + (Math.random() - 0.5) * sh
+        );
+        camera.lookAt(cp.x, 2.05, cp.z);
+        camera.rotation.z += (Math.random() - 0.5) * 0.12 * (1 - p);
+        camera.fov = 68 + 34 * Math.min(1, p * 5) - 6 * p;
+        camera.updateProjectionMatrix();
+        creatureGlow.intensity = 5 + Math.random() * 5;
+        cHead.rotation.set((Math.random() - 0.5) * 0.2, 0, (Math.random() - 0.5) * 0.3);
+        const fl = performance.now() * 0.05;
+        leftWing.rotation.z = 0.75 + Math.sin(fl) * 0.45;
+        rightWing.rotation.z = -0.75 - Math.sin(fl) * 0.45;
+        leftArm.rotation.x = -2.2 + Math.sin(fl * 1.3) * 0.25;
+        rightArm.rotation.x = -2.2 - Math.sin(fl * 1.3) * 0.25;
+        if (scareT <= 0) endScare();
+      }
+
+      function endScare() {
+        scareT = 0;
+        camera.fov = 68;
+        camera.updateProjectionMatrix();
+        canvas.style.filter = '';
+        creatureGlow.intensity = 0;
+        cHead.rotation.set(0, 0, 0);
+        state.yaw = Math.atan2(-scareDir.x, -scareDir.z);
+        state.pitch = 0.2;
+        camera.rotation.set(state.pitch, state.yaw, 0);
+        const bx = state.pos.x + scareDir.x * 1.9, bz = state.pos.z + scareDir.z * 1.9;
+        if (!checkCollision(bx, bz)) creatureGroup.position.set(bx, 0, bz);
+        enemyAI.attackCooldown = Math.max(enemyAI.attackCooldown, 1.2);
+      }
+
+      function updateAmbush(dt) {
+        if (ambushStage === 1) {
+          // hintayin munang matapos ang pagtakbuhan ng mga tao
+          if (cutT > 0 || state.isNoteOpen || state.isCinematic) return;
+          ambushStage = 2;
+          ambushT = 1.9;
+          ambushFlashWas = state.flashlightOn;
+          state.flashlightOn = false;
+          audio.playScareBuild(ambushT);
+          showSubtitle('ELIAS', '"Bakit... biglang tumahimik ang lahat?"', '"Why... did everything suddenly go quiet?"', 1800);
+        } else if (ambushStage === 2) {
+          ambushT -= dt;
+          const prog = 1 - ambushT / 1.9;
+          scareDark.style.transition = 'none';
+          scareDark.style.opacity = String(Math.min(0.9, prog * 1.4) * (Math.random() < 0.12 ? 0.35 : 1));
+          if (ambushT <= 0) {
+            ambushStage = 3;
+            scareDark.style.opacity = '0';
+            if (ambushFlashWas && state.battery > 0) state.flashlightOn = true;
+            enemyAI.hp = 100;
+            jumpscarePop(1.4);
+          }
+        }
+      }
+
       function triggerScriptedCreatureAmbush() {
         if (state.creatureEncountered) return;
         state.creatureEncountered = true;
-        creatureGroup.visible = true;
-        {
-          // pumili ng pwestong malayo sa manlalaro at hindi nakabaon sa harang
-          const cands = [[4.5, -14], [-3, -8], [0, -20], [8, 0], [-6, 6], [0, 12], [-8, -6], [6, -12], [0, 28], [-5, 20]];
-          let best = null, bd = 1e9, far = cands[0], fd = -1;
-          for (const c of cands) {
-            if (checkCollision(c[0], c[1])) continue;
-            const d = Math.hypot(c[0] - state.pos.x, c[1] - state.pos.z);
-            if (d >= 15 && d < bd) { bd = d; best = c; }
-            if (d > fd) { fd = d; far = c; }
-          }
-          const sp = best || far;
-          creatureGroup.position.set(sp[0], 0, sp[1]);
-        }
-        enemyAI.active = true;
-        enemyAI.state = 'CHASE';
-        enemyAI.hp = 100;
-
-        audio.playJumpscareStinger();
+        ambushStage = 1;
         audio.playCreatureScreech();
         setObjective(4);
         showSubtitle(
           'ELIAS',
-          '"DIYOS KO! Ano ang nilalang na iyan?! Lumaban o magtago!"',
-          '"MY GOD! What is that creature?! Fight back or hide!"',
-          5000
+          '"May sumigaw! Bakit nagtatakbuhan ang lahat?!"',
+          '"Someone screamed! Why is everyone running?!"',
+          4200
         );
       }
 
@@ -2991,27 +3183,14 @@
       function triggerTurnScare(camFwd) {
         state.behindCd = DIFF.behindCd;
         state.lookAway = 0;
-        for (const dd of [1.7, 1.3]) {
-          const px = state.pos.x + camFwd.x * dd, pz = state.pos.z + camFwd.z * dd;
-          if (!checkCollision(px, pz)) { creatureGroup.position.set(px, 0, pz); break; }
-        }
-        creatureGroup.lookAt(state.pos.x, 0, state.pos.z);
-        enemyAI.state = 'CHASE';
-        enemyAI.attackCooldown = 1.0; enemyAI.nav = null;
-        state.shake = 0.8;
-        audio.playJumpscareStinger();
-        audio.playCreatureScreech();
-        const fl = document.getElementById('scare-flash');
-        fl.style.transition = 'none';
-        fl.style.opacity = '1';
-        setTimeout(() => { fl.style.transition = 'opacity 0.6s ease'; fl.style.opacity = '0'; }, 70);
+        jumpscarePop(0.95);
         showToast('Lumingon ka... nasa harap mo na siya!');
         damagePlayer(8);
       }
 
       function updateEnemyAI(dt) {
         if (!enemyAI.active) return;
-        if (cutT > 0 || state.isNoteOpen) return;
+        if (cutT > 0 || state.isNoteOpen || scareT > 0) return;
 
         enemyAI.animPhase += dt * (enemyAI.state === 'CHASE' ? 15 : 9);
         leftArm.rotation.x = -0.75 + Math.sin(enemyAI.animPhase) * 0.28;
@@ -3132,7 +3311,7 @@
          8. COMBAT & INTERACTION
          ====================================================================== */
       function performAttack() {
-        if (!state.isPlaying || state.isPaused || state.isCinematic || state.isNoteOpen || cutT > 0) return;
+        if (!state.isPlaying || state.isPaused || state.isCinematic || state.isNoteOpen || cutT > 0 || scareT > 0) return;
         const wType = state.equippedWeapon;
         if (!wType) {
           showToast('Wala kang sandata! Kunin ang Sulo, Buntot Pagi, o Itak.');
@@ -3858,7 +4037,9 @@ const codeInput = [0, 0, 0];
             camera.position.set(Math.sin(elapsed * 0.25) * 2.5, 2.2, 28);
             camera.lookAt(0, 1.4, 12);
           } else if (!state.isPaused && !state.isGameOver) {
-            if (cutT > 0) {
+            if (scareT > 0) {
+              updateScare(dt);
+            } else if (cutT > 0) {
               cutT -= dt;
               camera.position.set(bonfirePos.x + 6.5, 2.5, bonfirePos.z + 7.5);
               camera.lookAt(bonfirePos.x, 1.2, bonfirePos.z - 1.5);
@@ -3975,6 +4156,7 @@ const codeInput = [0, 0, 0];
             );
 
             updateEnemyAI(dt);
+            updateAmbush(dt);
             let threatProximity = 0;
             if (enemyAI.active) {
               const distToCreature = state.pos.distanceTo(creatureGroup.position);
