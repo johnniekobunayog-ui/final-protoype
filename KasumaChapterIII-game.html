@@ -13,7 +13,7 @@
       --bg-dark: #060807;
       --accent-blood: #a81818;
       --accent-ember: #e07a22;
-      --accent-gold: #c9a66b;
+      --accent-gold: #a81818;
       --text-main: #e8e4dc;
       --text-muted: #9a9488;
       --hud-glass: rgba(10, 12, 14, 0.8);
@@ -481,13 +481,18 @@
           this.ctx = new AudioCtx();
           this.masterGain = this.ctx.createGain();
           this.masterGain.gain.value = 0.84;
-          this.masterGain.connect(this.ctx.destination);
+          this.lpFilter = this.ctx.createBiquadFilter(); this.lpFilter.type = 'lowpass'; this.lpFilter.frequency.value = 20000;
+          this.comp = this.ctx.createDynamicsCompressor();
+          this.comp.threshold.value = -14; this.comp.knee.value = 18; this.comp.ratio.value = 6; this.comp.attack.value = 0.004; this.comp.release.value = 0.25;
+          this.masterGain.connect(this.lpFilter); this.lpFilter.connect(this.comp); this.comp.connect(this.ctx.destination);
+          this._buildNoise();
 
           this.ambienceGain = this.ctx.createGain();
           this.ambienceGain.gain.value = 0.26;
           this.ambienceGain.connect(this.masterGain);
 
           this.startRuralNightAmbience();
+          this.startDread();
           this.isStarted = true;
         } catch (_) {}
       }
@@ -526,6 +531,7 @@
           this.ambienceGain.gain.cancelScheduledValues(now);
           this.ambienceGain.gain.setValueAtTime(this.ambienceGain.gain.value, now);
           this.ambienceGain.gain.linearRampToValueAtTime(0.0001, now + seconds);
+          this._fadeDread(seconds);
         } catch (_) {}
       }
 
@@ -540,7 +546,7 @@
         } catch (_) {}
       }
 
-      update(dt, threatProximity, hasAnting) {
+      update(dt, threatProximity, hasAnting, hp = 100) {
         if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
         try {
           if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -554,12 +560,14 @@
             this.creakTimer = 5.2 + Math.random() * 6.0;
             this.playWoodCreak(Math.random() * 1.6 - 0.8);
           }
-          if (threatProximity > 0.14) {
-            const rate = THREE.MathUtils.lerp(1.0, 0.28, threatProximity);
+          const lowHp = hp < 40 ? 0.35 + (1 - hp / 40) * 0.65 : 0;
+          const beatI = Math.max(threatProximity, lowHp);
+          if (beatI > 0.14) {
+            const rate = THREE.MathUtils.lerp(1.0, 0.28, beatI);
             this.heartbeatTimer -= dt;
             if (this.heartbeatTimer <= 0) {
               this.heartbeatTimer = rate;
-              this.playHeartbeat(threatProximity, hasAnting);
+              this.playHeartbeat(beatI, hasAnting);
             }
           }
         } catch (_) {}
@@ -632,22 +640,6 @@
             chime.connect(cGain); cGain.connect(this.masterGain);
             chime.start(now); chime.stop(now + 0.42);
           }
-        } catch (_) {}
-      }
-
-      playFootstep(isSprint = false) {
-        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
-        try {
-          const now = this.ctx.currentTime;
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(84, now);
-          osc.frequency.exponentialRampToValueAtTime(28, now + 0.09);
-          gain.gain.setValueAtTime(isSprint ? 0.16 : 0.09, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-          osc.connect(gain); gain.connect(this.masterGain);
-          osc.start(now); osc.stop(now + 0.11);
         } catch (_) {}
       }
 
@@ -833,6 +825,696 @@
           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
           osc.connect(gain); gain.connect(this.masterGain);
           osc.start(now); osc.stop(now + 0.62);
+        } catch (_) {}
+      }
+
+      /* ======================================================================
+         IDINAGDAG (CHAPTER III): SUPER NAKAKATAKOT NA BG SOUNDS + TUNOG NG MGA NILALANG
+         ====================================================================== */
+      _buildNoise() {
+        const n = this.ctx.sampleRate * 2;
+        this.noiseBuf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+        const d = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+        this._t = { hurt: 0, dmgAcc: 0, breath: 0, scare: 10, bed: 4, slow: 0, lastHp: null, lastStam: 100, lastBat: 100, warn35: false, muted: false, side: 1, zone: null };
+      }
+
+      _out(pan = 0) {
+        if (pan && this.ctx.createStereoPanner) {
+          const p = this.ctx.createStereoPanner();
+          p.pan.value = Math.max(-1, Math.min(1, pan));
+          p.connect(this.masterGain);
+          return p;
+        }
+        return this.masterGain;
+      }
+
+      // maikling ingay na dumadaan sa filter (dikdik, hampas, hininga, atbp.)
+      _noise(type, freq, q, t0, dur, vol, pan = 0, sweepTo = null, attack = null) {
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noiseBuf;
+        const f = this.ctx.createBiquadFilter();
+        f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+        if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t0 + dur);
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(Math.max(0.0002, vol), t0 + (attack ?? Math.min(0.012, dur * 0.3)));
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        src.connect(f); f.connect(g); g.connect(this._out(pan));
+        src.start(t0, Math.random() * 1.5, dur + 0.03);
+      }
+
+      _tone(type, f0, f1, t0, dur, vol, pan = 0, lp = 0, attack = 0.01) {
+        const o = this.ctx.createOscillator();
+        o.type = type;
+        o.frequency.setValueAtTime(f0, t0);
+        if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(Math.max(0.0002, vol), t0 + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        let node = o;
+        if (lp) { const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); node = f; }
+        node.connect(g); g.connect(this._out(pan));
+        o.start(t0); o.stop(t0 + dur + 0.03);
+      }
+
+      // tono na may vibrato at 3-puntong glide (alulong, iyak, huni ng halimaw)
+      _vib(type, f0, fMid, f1, dur, vol, pan, lp, vibHz, vibDepth, attack, t0 = null) {
+        const t = t0 ?? this.ctx.currentTime;
+        const o = this.ctx.createOscillator();
+        o.type = type;
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.linearRampToValueAtTime(fMid, t + dur * 0.4);
+        o.frequency.linearRampToValueAtTime(f1, t + dur);
+        const lfo = this.ctx.createOscillator(); lfo.frequency.value = vibHz;
+        const lg = this.ctx.createGain(); lg.gain.value = vibDepth;
+        lfo.connect(lg); lg.connect(o.frequency);
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(Math.max(0.0002, vol), t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        let n = o;
+        if (lp) { const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); n = f; }
+        n.connect(g); g.connect(this._out(pan));
+        o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+      }
+
+      // garalgal ng halimaw: dalawang saw + tremolo + ingay
+      _growl(base, dur, vol, pan, lpHz, lfoHz, endRatio = 0.6) {
+        const t = this.ctx.currentTime;
+        const o1 = this.ctx.createOscillator(), o2 = this.ctx.createOscillator();
+        o1.type = 'sawtooth'; o2.type = 'sawtooth';
+        o1.frequency.setValueAtTime(base, t); o1.frequency.linearRampToValueAtTime(base * endRatio, t + dur);
+        o2.frequency.setValueAtTime(base * 1.018, t); o2.frequency.linearRampToValueAtTime(base * 1.018 * endRatio, t + dur);
+        const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(lpHz, t); lp.frequency.linearRampToValueAtTime(lpHz * 0.5, t + dur);
+        const trem = this.ctx.createGain(); trem.gain.value = 0.55;
+        const lfo = this.ctx.createOscillator(); lfo.frequency.value = lfoHz;
+        const lg = this.ctx.createGain(); lg.gain.value = 0.45;
+        lfo.connect(lg); lg.connect(trem.gain);
+        const env = this.ctx.createGain();
+        env.gain.setValueAtTime(0.0001, t);
+        env.gain.linearRampToValueAtTime(Math.max(0.0002, vol), t + Math.min(0.15, dur * 0.25));
+        env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o1.connect(lp); o2.connect(lp); lp.connect(trem); trem.connect(env); env.connect(this._out(pan));
+        o1.start(t); o2.start(t); lfo.start(t);
+        o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+        this._noise('bandpass', lpHz * 1.2, 2, t, dur, vol * 0.22, pan, Math.max(80, lpHz * 0.5), 0.15);
+      }
+
+      toggleMute() {
+        if (!this._t || !this.ctx) return false;
+        this._t.muted = !this._t.muted;
+        this.masterGain.gain.setTargetAtTime(this._t.muted ? 0.0001 : 0.82, this.ctx.currentTime, 0.05);
+        return this._t.muted;
+      }
+
+
+      zoneAt(x, z) {
+        if (Math.abs(x + 10.5) < 4.8 && Math.abs(z - 22) < 4.3) return 'house';
+        if (Math.abs(x - 11) < 3.6 && Math.abs(z + 12) < 4.2) return 'chapel';
+        if (z < -28) return 'under';
+        if (x > 3 && z < 8 && z > -22) return 'grave';
+        if (z > 30) return 'village';
+        return 'road';
+      }
+
+      /* ---- Madilim na dagundong: menor segundo + tritone + salamin na tunog ---- */
+      startDread() {
+        try {
+          const t = this.ctx.currentTime;
+          this.dread = this.ctx.createGain(); this.dread.gain.value = 0.0001;
+          const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 190;
+          [[36.7, 'sawtooth'], [38.9, 'sawtooth'], [55, 'sine'], [77.8, 'sine']].forEach(([f, ty]) => {
+            const o = this.ctx.createOscillator(); o.type = ty; o.frequency.value = f; o.connect(lp); o.start(t);
+          });
+          const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.06;
+          const lg = this.ctx.createGain(); lg.gain.value = 70;
+          lfo.connect(lg); lg.connect(lp.frequency); lfo.start(t);
+          lp.connect(this.dread); this.dread.connect(this.masterGain);
+
+          // malamig na tritone pad na dahan-dahang lumalakas at humihina
+          this.dreadPad = this.ctx.createGain(); this.dreadPad.gain.value = 0.0001;
+          const padLfo = this.ctx.createOscillator(); padLfo.frequency.value = 0.11;
+          const padLg = this.ctx.createGain(); padLg.gain.value = 0.5;
+          const padTrem = this.ctx.createGain(); padTrem.gain.value = 0.5;
+          padLfo.connect(padLg); padLg.connect(padTrem.gain); padLfo.start(t);
+          [110, 155.6, 233.1].forEach(f => {
+            const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f; o.connect(padTrem); o.start(t);
+          });
+          padTrem.connect(this.dreadPad); this.dreadPad.connect(this.masterGain);
+
+          // manipis, nakakairitang salamin na tunog kapag may banta
+          this.dreadHigh = this.ctx.createGain(); this.dreadHigh.gain.value = 0.0001;
+          [2093, 2217, 3136].forEach(f => {
+            const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f; o.connect(this.dreadHigh); o.start(t);
+          });
+          this.dreadHigh.connect(this.masterGain);
+
+          this.ringGain = this.ctx.createGain(); this.ringGain.gain.value = 0.0001;
+          const ring = this.ctx.createOscillator(); ring.type = 'sine'; ring.frequency.value = 6200;
+          ring.connect(this.ringGain); this.ringGain.connect(this.masterGain); ring.start(t);
+        } catch (_) {}
+      }
+
+      _fadeDread(seconds) {
+        try {
+          const now = this.ctx.currentTime;
+          [this.dread, this.dreadPad, this.dreadHigh, this.ringGain].forEach(g => {
+            if (!g) return;
+            g.gain.cancelScheduledValues(now);
+            g.gain.setValueAtTime(g.gain.value, now);
+            g.gain.linearRampToValueAtTime(0.0001, now + seconds);
+          });
+        } catch (_) {}
+      }
+
+      /* ---- YAPAK (iba-iba ang sahig) ---- */
+      playFootstep(isSprint = false, crouch = false, zone = 'road') {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          const vol = crouch ? 0.45 : isSprint ? 1.25 : 0.85;
+          this._t.side = -this._t.side;
+          const pan = this._t.side * 0.1;
+          const pv = 0.92 + Math.random() * 0.2;
+          if (zone === 'house') {                       // kahoy na sahig
+            this._tone('sine', 150 * pv, 60, t, 0.12, 0.16 * vol, pan);
+            this._noise('bandpass', 420, 1.2, t, 0.14, 0.14 * vol, pan);
+            if (Math.random() < 0.22) this._vib('sawtooth', 170, 130, 90, 0.3, 0.035 * vol, pan, 520, 0, 0, 0.06);   // langitngit
+          } else if (zone === 'chapel' || zone === 'under') {   // bato, may alingawngaw
+            this._tone('sine', 110 * pv, 45, t, 0.1, 0.13 * vol, pan);
+            this._noise('highpass', 2200, 0.8, t, 0.05, 0.1 * vol, pan);
+            this._noise('highpass', 2200, 0.8, t + 0.14, 0.05, 0.04 * vol, pan);
+            this._tone('sine', 110 * pv, 45, t + 0.14, 0.1, 0.03 * vol, pan);
+          } else if (zone === 'grave') {                // basang damo
+            this._tone('sine', 78 * pv, 32, t, 0.11, 0.1 * vol, pan);
+            this._noise('lowpass', 900, 0.7, t, 0.18, 0.12 * vol, pan, 300, 0.05);
+            if (Math.random() < 0.3) this._noise('highpass', 4500, 0.7, t + 0.04, 0.14, 0.02 * vol, pan);
+          } else {                                       // putik at graba
+            this._tone('sine', 82 * pv, 32, t, 0.11, 0.13 * vol, pan);
+            this._noise('bandpass', (1300 + Math.random() * 900) * (isSprint ? 1.1 : 1), 0.9, t, isSprint ? 0.1 : 0.14, 0.11 * vol, pan);
+            this._noise('lowpass', 500, 0.7, t + 0.025, 0.12, 0.09 * vol, pan);
+          }
+        } catch (_) {}
+      }
+
+      /* ---- MGA NILALANG ---- */
+      _bat(pan, v, n = 3) {   // lagapak ng pakpak ng Wakwak
+        const t = this.ctx.currentTime;
+        for (let i = 0; i < n; i++) {
+          this._noise('lowpass', 520, 0.8, t + i * 0.15, 0.14, 0.04 + 0.12 * v, pan, 150);
+          this._tone('sine', 95, 35, t + i * 0.15, 0.13, 0.03 + 0.1 * v, pan);
+        }
+      }
+
+      playThreatVoice(kind, pan = 0, c = 0.5) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const v = Math.max(0.12, c), t = this.ctx.currentTime;
+          if (kind === 'wakwak') {
+            const n = 2 + Math.floor(Math.random() * 2);
+            for (let i = 0; i < n; i++) {
+              const ts = t + i * 0.24;
+              this._vib('sawtooth', 520, 430, 300, 0.2, 0.05 + 0.1 * v, pan, 2600, 40, 30, 0.01, ts);   // "wak!"
+              this._noise('bandpass', 1800, 2, ts, 0.16, 0.02 + 0.04 * v, pan);
+            }
+            this._bat(pan, v, 3);
+          } else if (kind === 'kaluluwa') {
+            this._vib('sine', 330, 440, 260, 2.4, 0.015 + 0.09 * v, pan, 1200, 4.5, 10, 0.7);
+            this._vib('triangle', 662, 880, 520, 2.4, 0.006 + 0.03 * v, pan, 2200, 4.5, 16, 0.8);
+            this._noise('bandpass', 2500, 6, t, 2.2, 0.01 + 0.03 * v, pan, 900, 0.8);
+          } else {
+            this._growl(70 * (0.9 + Math.random() * 0.2), 1.1, 0.04 + 0.18 * v, pan, 500, 24);
+            for (let i = 0; i < 3; i++) this._noise('bandpass', 900, 1, t + 0.7 + i * 0.2, 0.12, 0.02 + 0.05 * v, pan);   // hingal
+          }
+        } catch (_) {}
+      }
+
+      playThreatAlert(kind, pan = 0) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          if (kind === 'wakwak') {
+            this._vib('sawtooth', 900, 1400, 500, 0.7, 0.2, pan, 3000, 30, 40, 0.03);
+            this._bat(pan, 1, 4);
+          } else if (kind === 'kaluluwa') {
+            this._vib('sine', 700, 1000, 420, 1.6, 0.14, pan, 2400, 6, 25, 0.2);
+            this.playWhisperSpatial(pan, 1.1);
+          } else {
+            this._growl(60, 1.4, 0.4, pan, 600, 22);
+            this._tone('sawtooth', 300, 150, t + 0.05, 0.22, 0.1, pan, 1500);
+          }
+        } catch (_) {}
+      }
+
+      playThreatMove(kind, pan = 0, c = 0.5) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime, k = Math.max(0.05, c);
+          if (kind === 'wakwak') this._bat(pan, k, 1);
+          else if (kind === 'kaluluwa') this._noise('bandpass', 2000, 3, t, 0.6, 0.02 + 0.05 * k, pan, 900, 0.25);
+          else {   // sigbin: mabilis na kalatog ng kuko
+            this._noise('bandpass', 2800, 2, t, 0.05, 0.04 + 0.12 * k, pan);
+            this._tone('square', 220, 90, t, 0.04, 0.015 + 0.05 * k, pan);
+            this._noise('bandpass', 3200, 2, t + 0.08, 0.05, 0.03 + 0.09 * k, pan);
+          }
+        } catch (_) {}
+      }
+
+      playThreatAttack(kind) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          if (kind === 'wakwak') {
+            this._vib('sawtooth', 1100, 1700, 600, 0.8, 0.22, 0, 3200, 35, 50, 0.02);
+            this._bat(0.2, 1, 5);
+          } else if (kind === 'sigbin') {
+            this._growl(55, 1.2, 0.5, 0, 650, 26);
+            this._noise('highpass', 2500, 0.8, t + 0.1, 0.35, 0.18, 0, 800, 0.03);   // pagkagat
+          } else {
+            this._noise('bandpass', 700, 1, t, 0.5, 0.25, 0, 5000, 0.4);              // lamig na biglang dumampi
+            this._vib('sine', 900, 1300, 600, 1.0, 0.16, 0, 2600, 7, 30, 0.1);
+          }
+        } catch (_) {}
+      }
+
+      playThreatHit(pan = 0, weapon = 'sulo') {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          this._tone('sine', 130, 45, t, 0.18, 0.38, pan);
+          this._noise('lowpass', 1100, 0.8, t, 0.16, 0.3, pan, 250);
+          if (weapon === 'krus') {          // banal na sunog
+            this._noise('highpass', 4000, 0.7, t, 0.7, 0.12, pan, 2000, 0.02);
+            this._tone('sine', 880, 880, t, 0.9, 0.08, pan);
+            this._tone('sine', 1318, 1318, t + 0.04, 0.8, 0.05, pan);
+          } else if (weapon === 'punyal') {
+            this._noise('highpass', 3000, 0.7, t, 0.14, 0.2, pan, 7000);
+            this._tone('triangle', 2200, 900, t, 0.22, 0.05, pan);
+          } else if (weapon === 'agimat') {
+            this._tone('triangle', 1175, 1175, t, 0.8, 0.1, pan);
+            this._tone('triangle', 1760, 1760, t + 0.05, 0.7, 0.06, pan);
+          } else {                           // sulo
+            this._noise('bandpass', 2400, 1.2, t + 0.02, 0.25, 0.12, pan);
+          }
+        } catch (_) {}
+      }
+
+      playThreatHurt(pan = 0, kind = 'sigbin') {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          if (kind === 'wakwak') this._vib('sawtooth', 1000, 800, 400, 0.4, 0.15, pan, 2800, 30, 40, 0.01);
+          else if (kind === 'kaluluwa') this._vib('sine', 800, 1100, 500, 0.8, 0.12, pan, 2400, 8, 30, 0.05);
+          else this._vib('sawtooth', 480, 350, 200, 0.45, 0.16, pan, 1800, 22, 14, 0.02);
+        } catch (_) {}
+      }
+
+      playThreatDeath(pan = 0, kind = 'sigbin') {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          if (kind === 'wakwak') {
+            this._vib('sawtooth', 1600, 900, 160, 1.3, 0.2, pan, 2400, 12, 40, 0.02);
+            this._bat(pan, 0.8, 4);
+            this._tone('sine', 70, 22, t + 1.0, 0.35, 0.28, pan);
+          } else if (kind === 'kaluluwa') {
+            this._vib('sine', 440, 900, 1800, 1.8, 0.14, pan, 3000, 6, 25, 0.1);
+            this._noise('bandpass', 3000, 5, t, 1.6, 0.05, pan, 8000, 0.4);   // natutunaw sa hangin
+          } else {
+            this._vib('sawtooth', 520, 300, 70, 1.4, 0.2, pan, 1600, 9, 20, 0.02);
+            this._tone('sine', 65, 22, t + 0.15, 1.1, 0.35, pan);
+            this._tone('sine', 60, 25, t + 0.9, 0.3, 0.25, pan);
+          }
+        } catch (_) {}
+      }
+
+      playSaltSprinkle() {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          this._noise('highpass', 6000, 0.7, t, 0.7, 0.12, 0, 3500, 0.05);
+          for (let i = 0; i < 8; i++) this._noise('highpass', 5000, 1, t + 0.1 + Math.random() * 0.8, 0.03, 0.05);
+          this._tone('sine', 220, 220, t + 0.2, 1.6, 0.05, 0, 0, 0.4);
+        } catch (_) {}
+      }
+
+      playMemoryFlash() {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          this._noise('bandpass', 400, 2, t, 0.9, 0.18, 0, 4000, 0.85);   // baligtad na hangin
+          this._tone('sine', 55, 25, t + 0.9, 0.5, 0.4, 0);
+          this._tone('sine', 3600, 3600, t + 0.9, 1.0, 0.01, 0, 0, 0.05);
+        } catch (_) {}
+      }
+
+      /* ---- ASWANG (Mateo) ---- */
+      _choir(dur, vol, pan = 0) {
+        const t = this.ctx.currentTime;
+        const mix = this.ctx.createGain(); mix.gain.value = 1;
+        const env = this.ctx.createGain();
+        env.gain.setValueAtTime(0.0001, t);
+        env.gain.linearRampToValueAtTime(Math.max(0.0002, vol), t + dur * 0.4);
+        env.gain.linearRampToValueAtTime(0.0001, t + dur);
+        [[450, 5], [800, 6]].forEach(([f, q]) => {
+          const b = this.ctx.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = f; b.Q.value = q;
+          b.connect(mix);
+          [98, 116.54, 146.83, 196].forEach(n => [-6, 6].forEach(cents => {
+            const o = this.ctx.createOscillator(); o.type = 'sawtooth';
+            o.frequency.setValueAtTime(n, t); o.frequency.linearRampToValueAtTime(n * 0.97, t + dur);
+            o.detune.value = cents;
+            const g = this.ctx.createGain(); g.gain.value = 0.12;
+            o.connect(g); g.connect(b); o.start(t); o.stop(t + dur + 0.05);
+          }));
+        });
+        mix.connect(env); env.connect(this._out(pan));
+      }
+
+      playChoir(dur = 6, vol = 0.6) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try { this._choir(dur, 0.35 * vol); } catch (_) {}
+      }
+
+      playBoneCracks() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          for (let i = 0; i < 11; i++) {
+            const ts = t + 0.1 + i * 0.2 + Math.random() * 0.1;
+            this._noise('bandpass', 1500 + Math.random() * 2500, 6, ts, 0.04, 0.22);
+            this._tone('sine', 140, 60, ts, 0.06, 0.18);
+          }
+          this._noise('lowpass', 900, 0.8, t + 0.3, 1.8, 0.12, 0, 200, 0.4);   // basa at punit na laman
+        } catch (_) {}
+      }
+
+      playAswangVoice() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime, dur = 2.4;
+          const o = this.ctx.createOscillator(); o.type = 'sawtooth';
+          o.frequency.setValueAtTime(72, t); o.frequency.linearRampToValueAtTime(52, t + dur);
+          const mix = this.ctx.createGain();
+          [[500, 5, 1], [900, 7, 0.6]].forEach(([f, q, a]) => {
+            const b = this.ctx.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = f; b.Q.value = q;
+            const ga = this.ctx.createGain(); ga.gain.value = a;
+            o.connect(b); b.connect(ga); ga.connect(mix);
+          });
+          const env = this.ctx.createGain();
+          env.gain.setValueAtTime(0.0001, t); env.gain.linearRampToValueAtTime(0.55, t + 0.5); env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+          mix.connect(env); env.connect(this.masterGain);
+          o.start(t); o.stop(t + dur + 0.05);
+          this._growl(48, dur, 0.3, 0, 300, 9);
+        } catch (_) {}
+      }
+
+      playAswangShriek() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          this._vib('sawtooth', 700, 1500, 400, 0.9, 0.3, 0, 3200, 14, 60, 0.02);
+          this._vib('sawtooth', 1000, 2100, 600, 0.9, 0.15, 0, 3800, 11, 80, 0.02);
+          this._growl(50, 0.9, 0.5, 0, 700, 25);
+          this._noise('bandpass', 2500, 1, t, 0.8, 0.2, 0, 800, 0.02);
+        } catch (_) {}
+      }
+
+      playPlayerHurt(sev = 1) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          this._tone('sine', 95, 38, t, 0.22, 0.32 * sev, 0);
+          this._noise('lowpass', 800, 0.8, t, 0.22, 0.2 * sev, 0, 200);
+          this._tone('sine', 3400, 3400, t + 0.02, 0.9, 0.01 * sev, 0, 0, 0.05);   // ugong sa tainga
+        } catch (_) {}
+      }
+
+      playHeal() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+            this._tone('triangle', f, f, t + i * 0.09, 1.2, 0.11, 0);
+            this._tone('sine', f / 2, f / 2, t + i * 0.09, 1.0, 0.05, 0);
+          });
+          this._noise('highpass', 6000, 0.7, t, 0.9, 0.015, 0, null, 0.2);
+        } catch (_) {}
+      }
+
+      playBreath(intensity = 0.5) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime, i = Math.max(0.1, Math.min(1, intensity));
+          this._noise('bandpass', 1100, 0.8, t, 0.35, 0.05 + 0.07 * i, 0, 700, 0.12);
+          this._noise('bandpass', 800, 0.8, t + 0.45, 0.3, 0.03 + 0.05 * i, 0, 500, 0.1);
+        } catch (_) {}
+      }
+
+      playBatteryWarn() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          this._tone('sine', 880, 880, t, 0.09, 0.06, 0);
+          this._tone('sine', 880, 880, t + 0.16, 0.09, 0.06, 0);
+        } catch (_) {}
+      }
+
+      playPlayerDeath() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const t = this.ctx.currentTime;
+          this._tone('sine', 70, 18, t, 2.2, 0.5, 0);
+          this._noise('lowpass', 900, 0.7, t, 1.8, 0.25, 0, 80);
+          this.lpFilter.frequency.setTargetAtTime(500, t, 0.4);
+          if (this.dread) this.dread.gain.setTargetAtTime(0.0001, t, 0.3);
+        } catch (_) {}
+      }
+
+      /* ---- KATATAKUTANG TUNOG NG GUBAT ---- */
+
+      /* ---- KATATAKUTANG TUNOG NG BAWAT LUGAR ---- */
+      playRandomScare(zone = 'road', act = 1) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          const pan = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.4);
+          const pools = {
+            village: ['dog', 'dog', 'crow', 'scratch', 'phantom', 'knock', 'cry'],
+            road:    ['dog', 'crow', 'howl', 'phantom', 'whisper', 'scratch', 'owl'],
+            house:   ['door', 'knock', 'rocking', 'musicBox', 'phantom', 'breath', 'whisper', 'chains'],
+            chapel:  ['bell', 'chant', 'whisper', 'breath', 'knock', 'chains'],
+            grave:   ['crow', 'graveScrape', 'whisper', 'bell', 'owl', 'howl', 'chains', 'phantom'],
+            under:   ['drip', 'chant', 'chains', 'breath', 'whisper', 'graveScrape', 'bone', 'drip']
+          };
+          const pool = (pools[zone] || pools.road).slice();
+          if (act >= 2) pool.push('laugh', 'cry');
+          if (act >= 3) pool.push('riser', 'laugh', 'bone');
+          const pick = pool[Math.floor(Math.random() * pool.length)];
+          switch (pick) {
+            case 'dog': {
+              this._vib('triangle', 380, 520, 300, 2.8, 0.07, pan, 1000, 5, 8, 0.6);
+              setTimeout(() => { try { this._vib('triangle', 330, 450, 260, 2.4, 0.05, -pan, 900, 5, 8, 0.5); } catch (_) {} }, 1600);
+              break;
+            }
+            case 'howl': this._vib('triangle', 320, 560, 240, 3.0, 0.08, pan, 1100, 5, 9, 0.8); break;
+            case 'crow':
+              for (let i = 0; i < 3; i++) {
+                const ts = t + i * 0.32;
+                this._vib('sawtooth', 640, 520, 330, 0.24, 0.07, pan, 2400, 30, 35, 0.01, ts);
+                this._noise('bandpass', 1700, 2, ts, 0.2, 0.025, pan);
+              }
+              break;
+            case 'owl': [0, 0.45, 1.4, 1.85].forEach(o => this._tone('sine', 420, 380, t + o, 0.35, 0.09, pan, 900, 0.05)); break;
+            case 'scratch':
+              for (let i = 0; i < 7; i++) this._noise('bandpass', 2800 + Math.random() * 1200, 4, t + i * 0.11, 0.09, 0.06, pan);
+              break;
+            case 'knock':
+              [0, 0.35, 0.7].forEach(o => { this._tone('sine', 160, 90, t + o, 0.12, 0.2, pan); this._noise('lowpass', 700, 0.8, t + o, 0.1, 0.18, pan, 200); });
+              break;
+            case 'door':
+              this._tone('sine', 90, 35, t, 0.3, 0.45, pan);
+              this._noise('lowpass', 900, 0.8, t, 0.35, 0.3, pan, 150);
+              this._vib('sawtooth', 160, 110, 80, 0.8, 0.05, pan, 400, 0, 0, 0.1, t + 0.4);
+              break;
+            case 'rocking':
+              for (let i = 0; i < 4; i++) this._vib('sawtooth', 130, 105, 85, 0.9, 0.045, pan, 320, 0, 0, 0.3, t + i * 1.15);
+              break;
+            case 'musicBox': {
+              const notes = [659, 622, 659, 622, 659, 494, 587, 523, 440, 523, 440];
+              let ts = t;
+              notes.forEach((f, i) => {
+                const slow = i > 6 ? (i - 6) * 0.05 : 0;
+                const ff = f * (i > 8 ? 0.985 : 1);
+                this._tone('sine', ff, ff, ts, 1.1, 0.045, pan, 0, 0.004);
+                this._tone('triangle', ff * 2, ff * 2, ts, 0.5, 0.015, pan, 0, 0.004);
+                ts += 0.38 + slow;
+              });
+              break;
+            }
+            case 'chains':
+              for (let i = 0; i < 9; i++) {
+                const ts = t + i * 0.17 + Math.random() * 0.06, f = 2100 + Math.random() * 1200;
+                this._noise('highpass', 5000, 0.8, ts, 0.06, 0.05, pan);
+                this._tone('sine', f, f * 0.97, ts, 0.18, 0.02, pan);
+              }
+              break;
+            case 'graveScrape':
+              this._noise('bandpass', 500, 3, t, 1.4, 0.08, pan, 260, 0.3);
+              this._tone('sawtooth', 70, 55, t, 1.3, 0.02, pan, 200, 0.3);
+              break;
+            case 'drip':
+              for (let i = 0; i < 4; i++) {
+                const ts = t + i * (0.9 + Math.random() * 0.8);
+                this._tone('sine', 1800, 700, ts, 0.12, 0.08, pan);
+                this._tone('sine', 1800, 700, ts + 0.18, 0.12, 0.03, pan);
+              }
+              break;
+            case 'chant': this._choir(5.5, 0.05, pan * 0.5); break;
+            case 'breath':
+              for (let i = 0; i < 2; i++) {
+                this._noise('bandpass', 700, 0.9, t + i * 1.7, 1.2, 0.12, 0, 380, 0.5);
+                this._noise('bandpass', 500, 0.9, t + i * 1.7 + 0.9, 1.1, 0.09, 0, 280, 0.3);
+              }
+              break;
+            case 'bell': [[220, 0.05], [331, 0.03], [553, 0.02], [733, 0.015]].forEach(([f, v]) => this._tone('sine', f, f, t, 4, v, pan, 0, 0.005)); break;
+            case 'whisper':
+              this.playWhisperSpatial(pan, 0.9);
+              setTimeout(() => this.playWhisperSpatial(-pan, 1.1), 400);
+              setTimeout(() => this.playWhisperSpatial(0, 1.0), 900);
+              break;
+            case 'phantom':
+              for (let i = 0; i < 5; i++) {
+                const ts = t + i * 0.55, v = 0.06 + 0.035 * i;
+                this._tone('sine', 70, 30, ts, 0.12, v, 0);
+                this._noise('lowpass', 700, 0.8, ts, 0.12, v * 0.8, 0);
+              }
+              break;
+            case 'laugh':
+              for (let i = 0; i < 6; i++) {
+                const ts = t + i * 0.14, f = (680 - i * 40) * (1 + Math.random() * 0.05);
+                this._tone('sawtooth', f, f * 0.8, ts, 0.1, 0.045, pan, 1600);
+                this._noise('bandpass', 2000, 2, ts, 0.08, 0.02, pan);
+              }
+              break;
+            case 'cry':
+              this._vib('sawtooth', 520, 700, 450, 1.2, 0.05, pan, 2200, 6, 20, 0.15);
+              this._vib('sawtooth', 520, 700, 450, 1.2, 0.05, pan, 2200, 6, 20, 0.15, t + 1.5);
+              break;
+            case 'bone':
+              for (let i = 0; i < 6; i++) {
+                const ts = t + i * 0.22 + Math.random() * 0.1;
+                this._noise('bandpass', 1500 + Math.random() * 2500, 6, ts, 0.04, 0.12, pan);
+                this._tone('sine', 140, 60, ts, 0.06, 0.1, pan);
+              }
+              break;
+            case 'riser': {   // unti-unting lumalakas... katahimikan... BOOM
+              this._noise('bandpass', 300, 1.5, t, 2.8, 0.2, 0, 6000, 2.6);
+              this._vib('sawtooth', 120, 300, 900, 2.8, 0.05, 0, 1800, 6, 10, 2.4);
+              this._tone('sine', 55, 22, t + 3.1, 0.9, 0.5, 0);
+              this._noise('lowpass', 1500, 0.7, t + 3.1, 0.6, 0.3, 0, 150);
+              this._vib('sawtooth', 900, 1400, 500, 0.6, 0.12, pan, 3000, 30, 40, 0.02, t + 3.1);
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // maliliit na tunog sa background na paulit-ulit ayon sa lugar
+      playBed(zone = 'road') {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          const pan = (Math.random() * 2 - 1) * 0.8;
+          const r = Math.random();
+          if (zone === 'under') {
+            if (r < 0.6) { this._tone('sine', 1800, 700, t, 0.12, 0.07, pan); this._tone('sine', 1800, 700, t + 0.18, 0.12, 0.025, pan); }
+            else this._noise('lowpass', 300, 0.8, t, 2.2, 0.08, 0, 80, 0.8);   // dagundong ng bato
+          } else if (zone === 'house') {
+            if (r < 0.5) this._noise('bandpass', 2200, 8, t, 0.05, 0.06, pan);     // kaluskos ng kahoy
+            else this._vib('sawtooth', 140, 110, 80, 0.7, 0.035, pan, 300, 0, 0, 0.2);
+          } else if (zone === 'village' || zone === 'road') {
+            if (r < 0.4) this._tone('sawtooth', 350, 200, t, 0.25, 0.03, pan, 900);   // malayong tahol
+            else this._noise('bandpass', 600, 1, t, 3, 0.05, pan, 1400, 1.2);       // hangin
+          } else {
+            if (r < 0.5) this._noise('bandpass', 600, 1, t, 3, 0.05, pan, 1400, 1.2);
+            else this._vib('sawtooth', 640, 520, 330, 0.24, 0.025, pan, 2400, 30, 35, 0.01);   // malayong uwak
+          }
+        } catch (_) {}
+      }
+
+      playZoneEnter(zone) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const t = this.ctx.currentTime;
+          if (zone === 'house') { this.playWoodCreak(0); this._tone('sine', 90, 40, t, 0.25, 0.3, 0); }
+          else if (zone === 'under') { this._tone('sine', 55, 22, t, 1.4, 0.5, 0); this._noise('lowpass', 500, 0.8, t, 1.6, 0.2, 0, 80, 0.2); }
+          else if (zone === 'chapel') [[220, 0.06], [331, 0.04]].forEach(([f, v]) => this._tone('sine', f, f, t, 4, v, 0, 0, 0.005));
+          else if (zone === 'grave') { this._vib('sawtooth', 640, 520, 330, 0.24, 0.08, 0.5, 2400, 30, 35, 0.01); this._noise('bandpass', 500, 1, t, 2.4, 0.1, 0, 1500, 1); }
+        } catch (_) {}
+      }
+
+      /* ---- Per-frame na sound controller ---- */
+      updateGame(dt, g) {
+        if (!this.isStarted || !this.ctx || !this._t || this.mutedForFinale) return;
+        try {
+          const T = this._t, now = this.ctx.currentTime;
+          const zone = this.zoneAt(g.x, g.z);
+          const actF = Math.max(0, Math.min(1, (g.act - 1) / 3));
+
+          // Pagpasok sa bagong lugar
+          if (T.zone === null) T.zone = zone;
+          else if (zone !== T.zone) { T.zone = zone; this.playZoneEnter(zone); }
+
+          // Health bar: tama / paggaling
+          if (T.lastHp === null) T.lastHp = g.hp;
+          const dHp = g.hp - T.lastHp; T.lastHp = g.hp;
+          if (dHp < -0.01) T.dmgAcc += -dHp;
+          T.hurt -= dt;
+          if (T.dmgAcc > 0 && T.hurt <= 0) {
+            this.playPlayerHurt(Math.min(1.5, Math.max(0.5, T.dmgAcc / 10)));
+            T.dmgAcc = 0; T.hurt = 0.45;
+          }
+          if (dHp > 4) this.playHeal();
+          if (g.hp < 35 && !T.warn35) { T.warn35 = true; this._tone('sine', 58, 36, now, 1.1, 0.35, 0); }
+          if (g.hp >= 45) T.warn35 = false;
+
+          // Stamina: hingal
+          const sprinting = g.stamina < T.lastStam - 0.001; T.lastStam = g.stamina;
+          T.breath -= dt;
+          if (g.stamina < 28 && T.breath <= 0 && (sprinting || g.stamina < 12)) {
+            T.breath = 0.9 + g.stamina * 0.02;
+            this.playBreath(1 - g.stamina / 28);
+          }
+
+          // Baterya ng ilaw
+          if (g.flashlightOn) {
+            if (g.battery < 14 && T.lastBat >= 14) this.playBatteryWarn();
+            if (g.battery < 5 && T.lastBat >= 5) { this.playBatteryWarn(); setTimeout(() => this.playBatteryWarn(), 400); }
+          }
+          T.lastBat = g.battery;
+
+          // Random na katatakutang tunog (mas madalas habang tumatagal)
+          T.scare -= dt;
+          if (T.scare <= 0) {
+            T.scare = 22 - 13 * actF + Math.random() * 9;
+            if (g.threat < 0.7) this.playRandomScare(zone, g.act);
+          }
+          T.bed -= dt;
+          if (T.bed <= 0) { T.bed = 3 + Math.random() * 4; this.playBed(zone); }
+
+          // Mabagal na update (dagundong, muffle, tinnitus)
+          T.slow -= dt;
+          if (T.slow <= 0) {
+            T.slow = 0.12;
+            const under = zone === 'under' ? 0.04 : 0;
+            if (this.dread) this.dread.gain.setTargetAtTime(0.02 + g.threat * 0.09 + actF * 0.04 + under, now, 0.8);
+            if (this.dreadPad) this.dreadPad.gain.setTargetAtTime(0.012 + actF * 0.02 + g.threat * 0.03, now, 1.2);
+            if (this.dreadHigh) this.dreadHigh.gain.setTargetAtTime(0.0001 + g.threat * g.threat * 0.012, now, 0.4);
+            this.lpFilter.frequency.setTargetAtTime(g.hp < 30 ? 1500 + (g.hp / 30) * 14000 : 20000, now, 0.35);
+            if (this.ringGain) this.ringGain.gain.setTargetAtTime(g.hp < 25 ? 0.004 + (1 - g.hp / 25) * 0.01 : 0.0001, now, 0.4);
+          }
         } catch (_) {}
       }
     }
@@ -1516,6 +2198,12 @@
         memoryFlashTimer: 0, flickerT: 0, morphed: false
       };
 
+      // Pan ng tunog (kaliwa/kanan) batay sa posisyon ng pinagmulan
+      const sndPan = (p) => {
+        const dx = p.x - state.pos.x, dz = p.z - state.pos.z, d = Math.hypot(dx, dz) || 1;
+        return THREE.MathUtils.clamp((dx * Math.cos(state.yaw) - dz * Math.sin(state.yaw)) / d * 0.9, -0.9, 0.9);
+      };
+
       const ACTS = {
         1: { label: 'ACT I • ANG PAGTAKAS', title: 'Siyasatin ang liblib na pamayanan at lumang bahay', sub: 'Nakalabas ka na sa bundok, ngunit tila pamilyar ang nayong ito.' },
         2: { label: 'ACT II • ANG MGA NAWAWALANG ALAALA', title: 'Buksan ang Silid-Angkan sa Lumang Bahay-Kahoy', sub: 'Hanapin ang mga dokumento at lumang larawan tungkol sa nakaraan.' },
@@ -1536,7 +2224,7 @@
       function triggerMemoryFlash(duration = 1.6) {
         state.memoryFlashTimer = duration;
         document.getElementById('memory-overlay').style.opacity = '0.9';
-        audio.playWhisperSpatial(Math.random() > 0.5 ? 0.7 : -0.7, 0.92);
+        audio.playWhisperSpatial(Math.random() > 0.5 ? 0.7 : -0.7, 0.92); audio.playMemoryFlash();
         later(() => { document.getElementById('memory-overlay').style.opacity = '0'; }, duration * 1000);
       }
 
@@ -1559,6 +2247,7 @@
         flash.style.opacity = '0.82';
         audio.playCreatureScreech();
         audio.playJumpscareStinger(false);
+        audio.playThreatAttack(kind);
         scarePropGroup.visible = true;
         scareLight.intensity = 5; document.body.classList.add('scare-glitch'); audio.playScareBoom();
         showToast(message || 'MAY BIGLANG SUMULPOT SA DILIM!');
@@ -1569,7 +2258,7 @@
         }, 700);
 
         if (state.hp <= 0 && !state.isGameOver) {
-          state.isGameOver = true;
+          state.isGameOver = true; audio.playPlayerDeath();
           try { document.exitPointerLock?.(); } catch (_) {}
           document.getElementById('end-screen').classList.remove('hidden');
         }
@@ -2002,7 +2691,7 @@
         audio.playWeaponSwing(w);
 
         if (w === 'asin') {
-          state.saltWardTimer = 15.0;
+          state.saltWardTimer = 15.0; audio.playSaltSprinkle();
           showToast('Nagsaboy ka ng Banal na Asin! Hindi makakalapit ang mga masasamang espiritu.');
           threats.forEach(t => { t.stun = 5.5; });
           return;
@@ -2017,7 +2706,7 @@
           if (toT.length() < 3.8 && fwd.dot(toT.normalize()) > 0.4) {
             t.hp -= dmg;
             t.stun = 3.5;
-            audio.playCreatureScreech();
+            { const tp = sndPan(t.group.position); audio.playThreatHit(tp, w); if (t.hp <= 0) audio.playThreatDeath(tp, t.kind); else audio.playThreatHurt(tp, t.kind); }
             if (t.hp <= 0) {
               t.dead = true;
               scene.remove(t.group);
@@ -2169,6 +2858,7 @@
           flashlight.intensity = 0.35;
           scene.fog.density = 0.068;
           audio.playSupernaturalDrone(6.5);
+          audio.playChoir(6.5, 0.9);
           showSubtitle('MATEO', '"Elias..."', '"Elias..."', 2600);
 
           // Begin slow, unnatural 180-degree camera turn toward Mateo (yaw: 0 -> Math.PI)
@@ -2183,6 +2873,7 @@
           revealLight.position.set(0, 2.0, -40.5);
           revealLight.intensity = 2.6;
           audio.playAswangMorph();
+          audio.playAswangVoice(); audio.playBoneCracks();
           showSubtitle('MATEO (ASWANG)', '"Akala mo ba... inililigtas kita?"', '"Did you really think... I was saving you?"', 3000);
         }, 15000);
         later(() => showSubtitle('MATEO (ASWANG)', '"Ikaw ang huling alay, Elias."', '"You are the final offering, Elias."', 2200), 17400);
@@ -2192,7 +2883,7 @@
           state.finalePhase = 3;
           state.finaleTimer = 0;
           revealLight.intensity = 6.5;
-          audio.playJumpscareStinger(true); audio.playScareBoom();
+          audio.playJumpscareStinger(true); audio.playScareBoom(); audio.playAswangShriek();
           audio.playCreatureScreech();
           document.getElementById('scare-flash').style.opacity = '0.95';
           [120, 240, 360, 480, 600].forEach((ms, i) => later(() => { document.getElementById('scare-flash').style.opacity = i % 2 ? '0.9' : '0'; }, ms));
@@ -2328,6 +3019,7 @@
         if (e.code === 'KeyE') handleInteract();
         if (e.code === 'KeyJ') openJournal();
         if (e.code === 'KeyG') dropWeapon();
+        if (e.code === 'KeyM') { const mu = audio.toggleMute(); showToast(mu ? 'Pinatay ang tunog [M]' : 'Binuksan ang tunog [M]'); }
         if (e.code === 'KeyF' && state.battery > 1) { state.flashlightOn = !state.flashlightOn; audio.playFlashlightClick(); }
         if (e.code === 'KeyC' || e.code === 'ControlLeft') state.isCrouching = !state.isCrouching;
         if (e.code === 'Digit1') equipWeapon('sulo');
@@ -2559,7 +3251,7 @@
             if (inputLen > 0.1) {
               state.bobTimer += dt * (wantsSprint ? 13 : 8.5);
               state.stepTimer -= dt * (wantsSprint ? 1.6 : 1.0);
-              if (state.stepTimer <= 0) { state.stepTimer = 0.46; audio.playFootstep(wantsSprint); }
+              if (state.stepTimer <= 0) { state.stepTimer = 0.46; audio.playFootstep(wantsSprint, state.isCrouching, audio.zoneAt(state.pos.x, state.pos.z)); }
             }
             camera.position.set(state.pos.x, state.pos.y + (inputLen > 0.1 ? Math.sin(state.bobTimer) * 0.03 : 0), state.pos.z);
             camera.rotation.set(state.pitch, state.yaw, 0);
@@ -2618,6 +3310,11 @@
             const d = toP.length();
             if (d < closestDist) closestDist = d;
             t.group.lookAt(state.pos.x, 0, state.pos.z);
+            t.sndT = (t.sndT ?? (1 + Math.random() * 2)) - dt;
+            if (d < 22 && t.sndT <= 0) {
+              t.sndT = (t.kind === 'wakwak' ? 2.2 : 3.0) + Math.random() * 2.5 + d * 0.1;
+              audio.playThreatVoice(t.kind, sndPan(t.group.position), 1 - d / 22);
+            }
 
             if (t.kind === 'wakwak' && t.group.userData.wingL) {
               t.group.userData.wingL.rotation.z = Math.sin(elapsed * 14) * 0.45;
@@ -2626,9 +3323,15 @@
 
             const aggroRange = hidden ? 3.2 : (state.flashlightOn ? 15 : 8.5);
             if (d < aggroRange && state.saltWardTimer <= 0 && (t.kind !== 'sigbin' || state.pos.z < -22)) {
+              if (!t.alert) { t.alert = true; audio.playThreatAlert(t.kind, sndPan(t.group.position)); }
               const spd = t.kind === 'sigbin' ? DIFF.speed * 0.92 : 2.55;
               if (d > 1.75) {
                 t.group.position.addScaledVector(toP.normalize(), spd * dt);
+                t.stepT = (t.stepT ?? 0) - dt;
+                if (t.stepT <= 0) {
+                  t.stepT = t.kind === 'sigbin' ? 0.24 : t.kind === 'wakwak' ? 0.45 : 0.9;
+                  audio.playThreatMove(t.kind, sndPan(t.group.position), THREE.MathUtils.clamp(1 - d / 16, 0, 1));
+                }
               } else if (t.cooldown <= 0) {
                 t.cooldown = 8.0;
                 const scareText = t.kind === 'wakwak'
@@ -2639,6 +3342,7 @@
                 triggerJumpscare(t.kind, 13, scareText);
               }
             } else {
+              t.alert = false;
               t.phase += dt * 0.7;
               const wx = t.home.x + Math.cos(t.phase) * 2.8 - t.group.position.x, wz = t.home.z + Math.sin(t.phase) * 2.8 - t.group.position.z, wl = Math.hypot(wx, wz);
               if (wl > 0.001) { const stp = Math.min(wl, 3.2 * dt); t.group.position.x += wx / wl * stp; t.group.position.z += wz / wl * stp; }
@@ -2666,7 +3370,8 @@
 
           updateMissions();
           const threatProx = THREE.MathUtils.clamp(1 - closestDist / 18, 0, 1);
-          audio.update(dt, threatProx, state.ownedWeapons.agimat);
+          audio.update(dt, threatProx, state.ownedWeapons.agimat, state.hp);
+          audio.updateGame(dt, { hp: state.hp, stamina: state.stamina, battery: state.battery, flashlightOn: state.flashlightOn, threat: threatProx, x: state.pos.x, z: state.pos.z, act: state.act });
 
           document.getElementById('hp-val').textContent = `${Math.ceil(state.hp)}%`;
           document.getElementById('health-fill').style.width = `${state.hp}%`;
