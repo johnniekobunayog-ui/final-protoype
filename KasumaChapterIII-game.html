@@ -1,0 +1,2719 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KASÚMA — Chapter 3: Ang Lihim sa Likod ng mga Alaala (Part 1 Finale)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #060807;
+      --accent-blood: #a81818;
+      --accent-ember: #e07a22;
+      --accent-gold: #c9a66b;
+      --text-main: #e8e4dc;
+      --text-muted: #9a9488;
+      --hud-glass: rgba(10, 12, 14, 0.8);
+      --hud-border: rgba(201, 166, 107, 0.3);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background-color: var(--bg-dark); font-family: 'Inter', sans-serif; color: var(--text-main); }
+
+    #game-canvas { display: block; width: 100%; height: 100%; position: fixed; inset: 0; z-index: 1; cursor: crosshair; }
+    #vignette-layer { position: fixed; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(circle at center, transparent 44%, rgba(0, 0, 0, 0.76) 100%); }
+    #damage-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0; background: radial-gradient(circle at center, transparent 26%, rgba(175, 10, 10, 0.94) 100%); transition: opacity 0.2s ease; }
+    #memory-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 7; opacity: 0; mix-blend-mode: screen; background: radial-gradient(circle at 30% 40%, rgba(185, 130, 50, 0.32), transparent 65%), radial-gradient(circle at 70% 60%, rgba(155, 22, 22, 0.38), transparent 65%); transition: opacity 0.35s ease; }
+    #scare-flash { position: fixed; inset: 0; pointer-events: none; z-index: 42; opacity: 0; background: radial-gradient(circle at center, rgba(255,235,220,0.75) 0%, rgba(215,0,0,0.94) 60%, rgba(35,0,0,0.99) 100%); transition: opacity 0.06s ease; }
+    #blackout-screen { position: fixed; inset: 0; pointer-events: none; z-index: 45; opacity: 0; background: #000; transition: opacity 0.35s ease; }
+    #film-grain { position: fixed; inset: 0; pointer-events: none; z-index: 8; opacity: 0.055; background-image: repeating-radial-gradient(#fff 0 0.0001%, #000 0 0.0002%); background-size: 120px 120px; }
+
+    .letterbox { position: fixed; left: 0; right: 0; height: 0vh; background: #000; z-index: 30; transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1); pointer-events: none; }
+    #letterbox-top { top: 0; }
+    #letterbox-bottom { bottom: 0; }
+    body.cinematic .letterbox { height: 11vh; }
+
+    #chapter-banner { position: fixed; top: 24%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 35; pointer-events: none; opacity: 0; transition: opacity 1s ease; width: 92%; }
+    #chapter-banner.visible { opacity: 1; }
+    #chapter-banner .sub { font-size: 0.8rem; letter-spacing: 0.42em; text-transform: uppercase; color: var(--accent-ember); margin-bottom: 0.5rem; }
+    #chapter-banner h2 { font-family: 'Cinzel', serif; font-size: clamp(1.5rem, 4.2vw, 3rem); font-weight: 900; letter-spacing: 0.14em; color: #f3efe6; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.95); }
+    #chapter-banner .line { width: 160px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-gold), transparent); margin: 0.8rem auto 0; }
+
+    #hud { position: fixed; inset: 0; z-index: 15; pointer-events: none; transition: opacity 0.35s ease; }
+    body.cinematic #hud, body.menu-open #hud { opacity: 0; }
+
+    #objective-panel { position: absolute; top: 20px; left: 22px; max-width: 390px; background: linear-gradient(90deg, rgba(8, 10, 12, 0.9) 0%, rgba(8, 10, 12, 0.38) 100%); border-left: 3px solid var(--accent-ember); padding: 10px 16px; border-radius: 0 8px 8px 0; backdrop-filter: blur(4px); }
+    #objective-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent-ember); margin-bottom: 4px; }
+    #objective-text { font-size: 0.92rem; font-weight: 500; line-height: 1.35; color: var(--text-main); }
+    #objective-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; }
+
+    #top-right-hud { position: absolute; top: 20px; right: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .hud-pill { background: var(--hud-glass); border: 1px solid var(--hud-border); padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; letter-spacing: 0.08em; display: flex; align-items: center; gap: 8px; backdrop-filter: blur(6px); }
+    #stealth-indicator.hidden-state { color: #7ed99c; border-color: rgba(126, 217, 156, 0.45); }
+    #stealth-indicator.danger-state { color: #ff5c5c; border-color: rgba(255, 92, 92, 0.65); }
+    #pause-btn-hud { pointer-events: auto; cursor: pointer; color: var(--text-main); transition: background 0.2s; }
+    #pause-btn-hud:hover { background: rgba(201, 166, 107, 0.2); }
+
+    #reticle-wrapper { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    #reticle { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.72); box-shadow: 0 0 6px rgba(0, 0, 0, 0.9); transition: all 0.15s ease; }
+    #reticle.interactive { width: 14px; height: 14px; background: transparent; border: 2px solid var(--accent-gold); transform: scale(1.15); }
+    #interact-prompt { background: rgba(10, 11, 14, 0.9); border: 1px solid var(--hud-border); padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; color: #fff; white-space: nowrap; opacity: 0; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease; box-shadow: 0 4px 16px rgba(0,0,0,0.65); }
+    #interact-prompt.visible { opacity: 1; transform: translateY(0); }
+    .key-badge { display: inline-block; background: var(--accent-gold); color: #0b0b0c; font-weight: 700; font-size: 0.72rem; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+
+    #vitals-panel { position: absolute; bottom: 22px; left: 22px; display: flex; flex-direction: column; gap: 8px; min-width: 215px; }
+    .bar-group { display: flex; flex-direction: column; gap: 3px; }
+    .bar-header { display: flex; justify-content: space-between; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+    .bar-track { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.12); border-radius: 99px; overflow: hidden; }
+    .bar-fill { height: 100%; width: 100%; border-radius: 99px; transition: width 0.15s ease; }
+    #health-fill { background: linear-gradient(90deg, #8b1818, #d93838); }
+    #stamina-fill { background: linear-gradient(90deg, #9c7c44, #e5c37a); }
+    #battery-fill { background: linear-gradient(90deg, #3c7a89, #7be0f7); }
+
+    #weapon-panel { position: absolute; bottom: 22px; right: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    #equipped-info { text-align: right; background: var(--hud-glass); border: 1px solid var(--hud-border); padding: 8px 14px; border-radius: 10px; backdrop-filter: blur(6px); }
+    #equipped-name { font-family: 'Cinzel', serif; font-size: 0.92rem; font-weight: 700; color: var(--accent-gold); }
+    #equipped-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    #weapon-slots { display: flex; gap: 6px; }
+    .w-slot { width: 58px; height: 44px; background: rgba(12, 14, 18, 0.78); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.61rem; color: var(--text-muted); position: relative; transition: all 0.15s ease; }
+    .w-slot.has-item { color: var(--text-main); border-color: rgba(201, 166, 107, 0.45); }
+    .w-slot.active { border-color: var(--accent-ember); background: rgba(224, 122, 34, 0.22); transform: translateY(-2px); }
+    .w-slot .slot-num { position: absolute; top: 3px; left: 5px; font-size: 0.6rem; opacity: 0.75; }
+
+    #subtitle-box { position: fixed; bottom: 13%; left: 50%; transform: translateX(-50%); max-width: min(740px, 90vw); background: rgba(6, 7, 9, 0.92); border: 1px solid rgba(201, 166, 107, 0.35); padding: 13px 24px; border-radius: 10px; text-align: center; z-index: 48; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.85); }
+    #subtitle-box.visible { opacity: 1; }
+    #subtitle-speaker { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-gold); margin-bottom: 4px; }
+    #subtitle-text { font-size: 0.98rem; line-height: 1.45; color: #f4f1ea; }
+    #subtitle-sub { font-size: 0.78rem; font-style: italic; color: var(--text-muted); margin-top: 3px; }
+
+    #toast-msg { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); background: rgba(15, 17, 21, 0.94); border: 1px solid var(--accent-gold); color: #f7f3eb; padding: 8px 18px; border-radius: 20px; font-size: 0.82rem; z-index: 25; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+    #toast-msg.visible { opacity: 1; }
+
+    #note-modal, #code-modal, #journal-modal, #photo-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.86); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
+    #note-modal.open, #code-modal.open, #journal-modal.open, #photo-modal.open { display: flex; }
+
+    .parchment { position: relative; background: linear-gradient(145deg, #272119, #191510); border: 1px solid #6b5638; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95), inset 0 0 40px rgba(0,0,0,0.6); max-width: 560px; width: 100%; padding: 28px; border-radius: 12px; color: #e6dcc8; }
+    .parchment h3 { font-family: 'Cinzel', serif; color: var(--accent-gold); font-size: 1.22rem; margin-bottom: 12px; border-bottom: 1px solid rgba(201, 166, 107, 0.25); padding-bottom: 8px; }
+    .parchment p { font-size: 0.94rem; line-height: 1.68; white-space: pre-line; margin-bottom: 14px; }
+    .parchment .translation { font-size: 0.82rem; font-style: italic; color: #a69b87; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 10px; }
+
+    .btn-primary { background: linear-gradient(135deg, #9e1b1b, #691010); border: 1px solid rgba(255, 160, 140, 0.35); color: #fff; padding: 12px 26px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.08em; cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease; }
+    .btn-primary:hover { filter: brightness(1.18); transform: translateY(-1px); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.22); color: var(--text-main); padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.16); }
+
+    .fullscreen-overlay { position: fixed; inset: 0; z-index: 60; background: radial-gradient(circle at center, rgba(16, 14, 14, 0.88) 0%, rgba(5, 6, 8, 0.99) 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; backdrop-filter: blur(8px); }
+    .fullscreen-overlay.hidden { display: none; }
+    .game-logo { font-family: 'Cinzel', serif; font-size: clamp(2.6rem, 7vw, 5rem); font-weight: 900; letter-spacing: 0.24em; color: #f4efe6; text-shadow: 0 0 40px rgba(158, 27, 27, 0.72); margin-bottom: 6px; }
+    .game-tagline { font-size: 0.84rem; letter-spacing: 0.28em; text-transform: uppercase; color: #ff3b3b; font-weight: 700; margin-bottom: 18px; }
+    .menu-card { background: rgba(12, 13, 17, 0.78); border: 1px solid rgba(255, 46, 46, 0.45); border-radius: 14px; padding: 22px; max-width: 600px; width: 100%; margin-bottom: 16px; text-align: left; }
+    .controls-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; font-size: 0.8rem; color: #f4efe6; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.14); }
+    .controls-grid span strong { color: #ff4545; }
+    .quality-row, .diff-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .quality-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .quality-btns, .diff-btns { display: flex; gap: 6px; }
+    .q-btn, .d-btn { padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.22); color: #fff; cursor: pointer; }
+    .q-btn.active { background: var(--accent-ember); color: #090909; border-color: var(--accent-ember); }
+    .d-btn.active { background: #c91818; border-color: #ff4545; }
+    #diff-desc { font-size: 0.78rem; line-height: 1.5; color: #f4efe6; margin-top: 10px; opacity: 0.9; }
+
+    /* Part 1 Finale Ending Screen */
+    #finale-screen { position: fixed; inset: 0; z-index: 70; background: #000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 28px; text-align: center; }
+    #finale-screen.open { display: flex; }
+    #finale-kicker { font-size: 0.85rem; letter-spacing: 0.35em; color: var(--accent-ember); margin-bottom: 10px; opacity: 0; transition: opacity 1.2s ease; }
+    #finale-title { font-family: 'Cinzel', serif; font-size: clamp(1.8rem, 5vw, 3.6rem); font-weight: 900; letter-spacing: 0.18em; color: #f4efe6; margin-bottom: 10px; opacity: 0; transition: opacity 1.2s ease; }
+    #finale-part { font-size: 1rem; letter-spacing: 0.32em; color: #ff3b3b; font-weight: 700; margin-bottom: 24px; opacity: 0; transition: opacity 1.2s ease; }
+    #finale-quote { font-family: 'Cinzel', serif; font-size: clamp(1rem, 2.5vw, 1.35rem); color: var(--accent-gold); letter-spacing: 0.1em; max-width: 640px; line-height: 1.6; opacity: 0; transition: opacity 1.4s ease; }
+    #finale-teaser { font-size: 1.05rem; font-style: italic; color: #ff7b7b; margin-top: 28px; letter-spacing: 0.08em; opacity: 0; transition: opacity 1.2s ease; }
+    #finale-actions { margin-top: 34px; opacity: 0; transition: opacity 1s ease; }
+
+    #mobile-controls { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: none; }
+    @media (pointer: coarse), (max-width: 900px) {
+      #mobile-controls { display: block; }
+      #vitals-panel { bottom: 155px; left: 14px; min-width: 150px; }
+      #weapon-panel { bottom: 155px; right: 14px; }
+    }
+    #joy-zone { position: absolute; bottom: 24px; left: 24px; width: 112px; height: 112px; border-radius: 50%; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.2); pointer-events: auto; touch-action: none; }
+    #joy-stick { position: absolute; top: 50%; left: 50%; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; background: rgba(201, 166, 107, 0.6); border: 1px solid #fff; }
+    #look-zone { position: absolute; top: 60px; right: 0; width: 55%; height: calc(100% - 210px); pointer-events: auto; touch-action: none; }
+    #mobile-action-btns { position: absolute; bottom: 22px; right: 18px; display: grid; grid-template-columns: repeat(3, 52px); gap: 8px; pointer-events: auto; }
+    .m-btn { width: 52px; height: 52px; border-radius: 50%; background: rgba(14, 16, 20, 0.8); border: 1px solid var(--hud-border); color: #fff; font-size: 0.64rem; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; touch-action: manipulation; }
+    .m-btn:active { background: var(--accent-ember); color: #000; }
+    .m-btn.atk { border-color: #d93838; background: rgba(139, 24, 24, 0.7); }
+
+    #code-wheels { display: flex; justify-content: center; gap: 18px; margin: 10px 0 14px; }
+    .wheel { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .wheel button { width: 54px; height: 30px; background: rgba(255,255,255,0.08); border: 1px solid rgba(201,166,107,0.4); color: #e6dcc8; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    .wheel .dig { width: 54px; height: 64px; display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; font-size: 2rem; font-weight: 900; color: #f3efe6; background: rgba(0,0,0,0.45); border: 1px solid #6b5638; border-radius: 8px; }
+    #code-msg { min-height: 1.3em; text-align: center; font-size: 0.85rem; color: #ff7b6b; margin-bottom: 10px; }
+    #journal-list { font-size: 0.88rem; line-height: 1.6; margin-bottom: 14px; max-height: 55vh; overflow-y: auto; }
+    #journal-list .j-item { border-left: 2px solid var(--accent-gold); padding-left: 10px; margin-bottom: 10px; }
+    #journal-list .j-item b { color: var(--accent-gold); }
+    #journal-list .j-empty { color: var(--text-muted); font-style: italic; margin-bottom: 10px; }
+    #mission-list { list-style: none; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 0.72rem; line-height: 1.55; }
+    #mission-list li { color: var(--text-muted); }
+    #mission-list li.done { color: #7ed99c; text-decoration: line-through; opacity: 0.7; }
+    #mission-list li.next { color: #fff; font-weight: 600; }
+    #mission-list li.opt::after { content: ' (opsyonal)'; font-size: 0.62rem; opacity: 0.7; }
+    #mission-list .dist { color: var(--accent-gold); margin-left: 4px; }
+
+    /* Photo Archive Puzzle Grid */
+    #photo-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+    .p-card { background: rgba(0,0,0,0.55); border: 1px solid #6b5638; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+    .p-card:hover { border-color: var(--accent-gold); }
+    .p-card .p-yr { font-family: 'Cinzel', serif; font-size: 1.15rem; font-weight: 900; color: var(--accent-gold); margin-bottom: 4px; }
+    .p-card .p-desc { font-size: 0.75rem; color: #d8cfc0; line-height: 1.35; }
+  body.scare-glitch #game-canvas{filter:contrast(1.5) saturate(1.8) hue-rotate(-12deg);animation:scareJitter .09s steps(2) infinite}
+  @keyframes scareJitter{0%{transform:translate(-6px,2px) scale(1.03)}100%{transform:translate(6px,-3px) scale(1.05)}}
+  </style>
+</head>
+<body class="menu-open">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Atmosphere & Jumpscare Overlays -->
+  <div id="vignette-layer"></div>
+  <div id="damage-vignette"></div>
+  <div id="memory-overlay"></div>
+  <div id="scare-flash"></div>
+  <div id="blackout-screen"></div>
+  <div id="film-grain"></div>
+
+  <!-- Letterbox & Chapter 3 Banner -->
+  <div id="letterbox-top" class="letterbox"></div>
+  <div id="letterbox-bottom" class="letterbox"></div>
+  <div id="chapter-banner">
+    <div class="sub">KASÚMA • IKATLONG KABANATA • PART 1 FINALE</div>
+    <h2>CHAPTER 3 — ANG LIHIM SA LIKOD NG MGA ALAALA</h2>
+    <div class="line"></div>
+  </div>
+
+  <!-- Notifications & Subtitles -->
+  <div id="toast-msg"></div>
+  <div id="subtitle-box">
+    <div id="subtitle-speaker">ELIAS</div>
+    <div id="subtitle-text">...</div>
+    <div id="subtitle-sub"></div>
+  </div>
+
+  <!-- Main HUD -->
+  <div id="hud">
+    <div id="objective-panel">
+      <div id="objective-label">ACT I • ANG PAGTAKAS</div>
+      <div id="objective-text">Siyasatin ang liblib na nayon at lumang bahay</div>
+      <div id="objective-sub">Nakalabas ka na sa lagusan ng bundok, ngunit may kakaiba sa paligid.</div>
+      <ul id="mission-list"></ul>
+    </div>
+
+    <div id="top-right-hud">
+      <button id="pause-btn-hud" class="hud-pill">[ESC] PAUSE / SAVE</button>
+      <div id="stealth-indicator" class="hud-pill">
+        <span id="stealth-icon">👁</span>
+        <span id="stealth-text">NAKIKITA</span>
+      </div>
+      <div id="clue-counter" class="hud-pill">EBIDENSYA NI MATEO: 0 / 4</div>
+    </div>
+
+    <div id="reticle-wrapper">
+      <div id="reticle"></div>
+      <div id="interact-prompt"><span class="key-badge">E</span> Siyasatin</div>
+    </div>
+
+    <div id="vitals-panel">
+      <div class="bar-group">
+        <div class="bar-header"><span>KALUSUGAN (HP)</span><span id="hp-val">100%</span></div>
+        <div class="bar-track"><div id="health-fill" class="bar-fill"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-header"><span>LAKAS (STAMINA)</span><span id="stam-val">100%</span></div>
+        <div class="bar-track"><div id="stamina-fill" class="bar-fill"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-header"><span>PANANGLAW (FLASHLIGHT) [F]</span><span id="bat-val">90%</span></div>
+        <div class="bar-track"><div id="battery-fill" class="bar-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="weapon-panel">
+      <div id="equipped-info">
+        <div id="equipped-name">PLASLAYT / KANDILA</div>
+        <div id="equipped-hint">[Left Click] Hataw / Banal na Asin • [1-5] Palit Gamit</div>
+      </div>
+      <div id="weapon-slots">
+        <div class="w-slot has-item active" id="slot-1"><span class="slot-num">1</span>SULO</div>
+        <div class="w-slot" id="slot-2"><span class="slot-num">2</span>KRUS</div>
+        <div class="w-slot" id="slot-3"><span class="slot-num">3</span>PUNYAL</div>
+        <div class="w-slot" id="slot-4"><span class="slot-num">4</span>AGIMAT</div>
+        <div class="w-slot" id="slot-5"><span class="slot-num">5</span>ASIN</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Touch Controls -->
+  <div id="mobile-controls">
+    <div id="joy-zone"><div id="joy-stick"></div></div>
+    <div id="look-zone"></div>
+    <div id="mobile-action-btns">
+      <button class="m-btn" id="m-flash">PLAS</button>
+      <button class="m-btn" id="m-crouch">YUKO</button>
+      <button class="m-btn" id="m-swap">PALIT</button>
+      <button class="m-btn" id="m-drop">DROP</button>
+      <button class="m-btn" id="m-interact">KUNIN</button>
+      <button class="m-btn atk" id="m-attack">GAMIT</button>
+      <button class="m-btn" id="m-journal">LIBRO</button>
+    </div>
+  </div>
+
+  <!-- Note / Document Modal -->
+  <div id="note-modal">
+    <div class="parchment">
+      <h3 id="note-title">Dokumento</h3>
+      <p id="note-body"></p>
+      <div id="note-trans" class="translation"></div>
+      <div style="margin-top: 20px; text-align: right;">
+        <button id="close-note-btn" class="btn-primary">[E / ESC] Isara ang Dokumento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ancestral Room Combination Lock Modal -->
+  <div id="code-modal">
+    <div class="parchment">
+      <h3 id="code-modal-title">Kandado ng Silid-Angkan (Ancestral Lock)</h3>
+      <p id="code-hint">Ilagay ang 3-digit na taon mula sa larawan ng kasunduan sa lumang bahay.</p>
+      <div id="code-wheels">
+        <div class="wheel"><button data-w="0" data-d="1">▲</button><div class="dig" id="dig-0">0</div><button data-w="0" data-d="-1">▼</button></div>
+        <div class="wheel"><button data-w="1" data-d="1">▲</button><div class="dig" id="dig-1">0</div><button data-w="1" data-d="-1">▼</button></div>
+        <div class="wheel"><button data-w="2" data-d="1">▲</button><div class="dig" id="dig-2">0</div><button data-w="2" data-d="-1">▼</button></div>
+      </div>
+      <div id="code-msg"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button id="code-close" class="btn-secondary">Isara</button>
+        <button id="code-try" class="btn-primary">Buksan ang Silid</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historical Photo Chronology Puzzle Modal -->
+  <div id="photo-modal">
+    <div class="parchment">
+      <h3>Altar ng mga Larawan (Pagkakasunod-sunod ng Kasaysayan)</h3>
+      <p style="font-size:0.86rem;">Pindutin ang mga lumang litrato mula sa <strong>PINAKAMATANDA hanggang PINAKABAGO</strong> upang mabuksan ang lihim na lagusan sa ilalim ng kapilya.</p>
+      <div id="photo-slots">
+        <div class="p-card" data-order="2">
+          <div class="p-yr">1974</div>
+          <div class="p-desc">Ang sumpa sa lumang kapilya at ang unang pagkawala ng mga tagabaryo.</div>
+        </div>
+        <div class="p-card" data-order="1">
+          <div class="p-yr">1948</div>
+          <div class="p-desc">Pagtatayo ng lumang bahay-kahoy at kasunduan ng dugong-bantay.</div>
+        </div>
+        <div class="p-card" data-order="3">
+          <div class="p-yr">1998</div>
+          <div class="p-desc">Pagdating ni Elias sa handaan — kasama ang isang aninong nakangiti sa likod.</div>
+        </div>
+      </div>
+      <div id="photo-status" style="font-size:0.82rem; color:var(--accent-gold); min-height:1.4em; margin-bottom:10px;">Napili: Wala pa</div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button id="photo-reset" class="btn-secondary">Ulitin</button>
+        <button id="photo-close" class="btn-secondary">Isara</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Journal Modal -->
+  <div id="journal-modal">
+    <div class="parchment">
+      <h3>Talaarawan at mga Alaala ni Elias</h3>
+      <div id="journal-list"></div>
+      <div style="text-align:right;"><button id="journal-close" class="btn-primary">[J / ESC] Isara</button></div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="fullscreen-overlay">
+    <div class="game-logo">KASÚMA</div>
+    <div class="game-tagline">CHAPTER 3 — ANG LIHIM SA LIKOD NG MGA ALAALA (PART 1 FINALE)</div>
+    <div class="menu-card">
+      <p style="font-size: 0.92rem; line-height: 1.65; color: #fff;">
+        Matapos makatakas sa lagusan ng bundok, nakarating si <strong>Elias</strong> sa isang liblib at inabandonang pamayanan. Ngunit habang lumalalim ang gabi, bumabalik ang mga pira-pirasong alaala mula sa <em>Handaan</em> at sa <em>Gubat</em>—mga alaalang may kinalaman kay <strong style="color:#ff4545;">Mateo</strong>.
+      </p>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.14); font-size:0.82rem; line-height:1.6; color:#fff;">
+        <strong style="color:#e07a22; letter-spacing:0.15em;">MISYON:</strong> Siyasatin ang <strong>Lumang Bahay-Kahoy</strong>, ang <strong>Nakalimutang Kapilya</strong>, ang <strong>Sementeryo</strong>, at ang <strong>Lihim na Silid-Ritwal</strong> sa ilalim ng lupa. Tuklasin ang buong katotohanan sa likod ng pagkawala ni Mateo.
+      </div>
+      <div class="controls-grid">
+        <span><strong>WASD</strong> — Maglakad</span>
+        <span><strong>MOUSE / DRAG</strong> — Lumingon</span>
+        <span><strong>SHIFT</strong> — Tumakbo</span>
+        <span><strong>C / CTRL</strong> — Yumuko / Magtago</span>
+        <span><strong>F</strong> — Plaslayt On/Off</span>
+        <span><strong>E</strong> — Kunin / Basahin / Siyasatin</span>
+        <span><strong>1 - 5</strong> — Palit Gamit</span>
+        <span><strong>G</strong> — Bitawan ang Gamit</span>
+        <span><strong>LEFT CLICK</strong> — Hataw / Banal na Asin</span>
+        <span><strong>J</strong> — Talaarawan (Journal)</span>
+      </div>
+      <div class="quality-row">
+        <span style="font-size: 0.8rem; font-weight: 600;">GRAPHICS QUALITY:</span>
+        <div class="quality-btns">
+          <button class="q-btn" data-q="low">LOW</button>
+          <button class="q-btn active" data-q="medium">MEDIUM</button>
+          <button class="q-btn" data-q="high">HIGH</button>
+        </div>
+      </div>
+    </div>
+    <div class="menu-card">
+      <div class="diff-head">
+        <span style="font-size: 0.8rem; font-weight: 600;">ANTAS NG HIRAP:</span>
+        <div class="diff-btns">
+          <button class="d-btn" data-d="easy">EASY</button>
+          <button class="d-btn active" data-d="medium">MEDIUM</button>
+          <button class="d-btn" data-d="expert">EXPERT</button>
+        </div>
+      </div>
+      <div id="diff-desc"></div>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;">
+      <button id="start-game-btn" class="btn-primary">SIMULAN ANG CHAPTER 3</button>
+      <button id="load-save-btn" class="btn-secondary" style="display:none;">IPAGPATULOY ANG SAVE</button>
+    </div>
+  </div>
+
+  <!-- Pause Screen -->
+  <div id="pause-screen" class="fullscreen-overlay hidden">
+    <div class="game-logo" style="font-size: 2.4rem;">NAKA-PAUSE</div>
+    <div class="game-tagline">CHAPTER 3 — ANG LIHIM SA LIKOD NG MGA ALAALA</div>
+    <div class="menu-card">
+      <div style="font-size: 0.85rem; color: var(--accent-gold); margin-bottom: 8px;">MGA BAGONG BABALA SA NAYON:</div>
+      <ul style="font-size: 0.82rem; color: var(--text-muted); padding-left: 18px; line-height: 1.6;">
+        <li><strong>Manananggal / Wakwak sa Bubong:</strong> Pakinggan ang pagaspas at lagitik sa itaas. Yumuko [C] sa loob ng bahay o sa ilalim ng silungan at patayin ang plaslayt [F].</li>
+        <li><strong>Tiyanak / Ligaw na Kaluluwa sa Sementeryo:</strong> Nagpapanggap na umiiyak o bumubulong. Tabuyin sila gamit ang <strong>Banal na Krus [2]</strong> o <strong>Banal na Asin [5]</strong>.</li>
+        <li><strong>Bantay sa Ilalim ng Lupa (Sigbin):</strong> Mabilis kumilos sa dilim. Gamitin ang <strong>Punyal [3]</strong> o <strong>Agimat [4]</strong>.</li>
+      </ul>
+      <div class="quality-row">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">GRAPHICS PRESET:</span>
+        <div class="quality-btns">
+          <button class="q-btn" data-q="low">LOW</button>
+          <button class="q-btn active" data-q="medium">MEDIUM</button>
+          <button class="q-btn" data-q="high">HIGH</button>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;">
+      <button id="resume-btn" class="btn-primary">IPAGPATULOY</button>
+      <button id="save-checkpoint-btn" class="btn-secondary">I-SAVE ANG CHECKPOINT</button>
+      <button id="restart-btn" class="btn-secondary">ULITIN ANG CHAPTER 3</button>
+    </div>
+  </div>
+
+  <!-- Game Over Screen (Death) -->
+  <div id="end-screen" class="fullscreen-overlay hidden">
+    <div id="end-title" class="game-logo" style="font-size: 2.6rem;">NALAGOT ANG HININGA</div>
+    <div id="end-sub" class="game-tagline" style="max-width: 560px; line-height: 1.6; letter-spacing: 0.14em;">
+      Nilamon ka ng mga anino bago mo pa natuklasan ang buong katotohanan.
+    </div>
+    <div style="display:flex; gap:12px; margin-top:18px; flex-wrap:wrap; justify-content:center;">
+      <button id="end-restart-btn" class="btn-primary">SUBUKAN MULI</button>
+    </div>
+  </div>
+
+  <!-- Mandatory Part 1 Open Ending Screen -->
+  <div id="finale-screen">
+    <div id="finale-kicker">KASÚMA</div>
+    <div id="finale-title">CHAPTER 3 — ANG LIHIM SA LIKOD NG MGA ALAALA</div>
+    <div id="finale-part">PART 1 HAS ENDED.</div>
+    <div id="finale-quote">"ANG KATOTOHANAN AY HINDI PA ANG KATAPUSAN."</div>
+    <div id="finale-teaser">MATEO: "Akala mo ba... ako lang?"</div>
+    <div id="finale-actions">
+      <button id="finale-replay-btn" class="btn-secondary">ULITIN ANG PART 1 FINALE</button>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const THREE = window.THREE;
+    if (!THREE) return;
+
+    let subtitleTimeout = null;
+    function showSubtitle(speaker, tagalog, english, duration = 4800) {
+      const box = document.getElementById('subtitle-box');
+      document.getElementById('subtitle-speaker').textContent = speaker;
+      document.getElementById('subtitle-text').textContent = tagalog;
+      document.getElementById('subtitle-sub').textContent = english || '';
+      box.classList.add('visible');
+      clearTimeout(subtitleTimeout);
+      subtitleTimeout = setTimeout(() => box.classList.remove('visible'), duration);
+    }
+
+    let toastTimeout = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => el.classList.remove('visible'), 3200);
+    }
+
+    /* ------------------------------------------------------------------------
+       PROCEDURAL HORROR AUDIO ENGINE (WITH ENDING CUTOFF & TRANSFORMATION)
+       ------------------------------------------------------------------------ */
+    class HorrorAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.ambienceGain = null;
+        this.isStarted = false;
+        this.mutedForFinale = false;
+        this.heartbeatTimer = 0;
+        this.cricketTimer = 0;
+        this.creakTimer = 4.0;
+      }
+
+      init() {
+        try {
+          if (this.isStarted) {
+            if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+            return;
+          }
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          this.ctx = new AudioCtx();
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = 0.84;
+          this.masterGain.connect(this.ctx.destination);
+
+          this.ambienceGain = this.ctx.createGain();
+          this.ambienceGain.gain.value = 0.26;
+          this.ambienceGain.connect(this.masterGain);
+
+          this.startRuralNightAmbience();
+          this.isStarted = true;
+        } catch (_) {}
+      }
+
+      startRuralNightAmbience() {
+        try {
+          const bufferSize = this.ctx.sampleRate * 3;
+          const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let lastOut = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + 0.022 * white) / 1.022;
+            lastOut = output[i];
+            output[i] *= 2.6;
+          }
+          const wind = this.ctx.createBufferSource();
+          wind.buffer = noiseBuffer;
+          wind.loop = true;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = 230;
+          filter.Q.value = 1.2;
+
+          wind.connect(filter);
+          filter.connect(this.ambienceGain);
+          wind.start();
+        } catch (_) {}
+      }
+
+      fadeOutAmbience(seconds = 1.8) {
+        if (!this.isStarted || !this.ctx || !this.ambienceGain) return;
+        try {
+          const now = this.ctx.currentTime;
+          this.ambienceGain.gain.cancelScheduledValues(now);
+          this.ambienceGain.gain.setValueAtTime(this.ambienceGain.gain.value, now);
+          this.ambienceGain.gain.linearRampToValueAtTime(0.0001, now + seconds);
+        } catch (_) {}
+      }
+
+      stopAllAudio() {
+        this.mutedForFinale = true;
+        if (!this.isStarted || !this.ctx || !this.masterGain) return;
+        try {
+          const now = this.ctx.currentTime;
+          this.masterGain.gain.cancelScheduledValues(now);
+          this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+          this.masterGain.gain.linearRampToValueAtTime(0.0001, now + 0.25);
+        } catch (_) {}
+      }
+
+      update(dt, threatProximity, hasAnting) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          this.cricketTimer -= dt;
+          if (this.cricketTimer <= 0) {
+            this.cricketTimer = 1.5 + Math.random() * 2.5;
+            if (threatProximity < 0.55) this.playCricketChirp();
+          }
+          this.creakTimer -= dt;
+          if (this.creakTimer <= 0) {
+            this.creakTimer = 5.2 + Math.random() * 6.0;
+            this.playWoodCreak(Math.random() * 1.6 - 0.8);
+          }
+          if (threatProximity > 0.14) {
+            const rate = THREE.MathUtils.lerp(1.0, 0.28, threatProximity);
+            this.heartbeatTimer -= dt;
+            if (this.heartbeatTimer <= 0) {
+              this.heartbeatTimer = rate;
+              this.playHeartbeat(threatProximity, hasAnting);
+            }
+          }
+        } catch (_) {}
+      }
+
+      playWoodCreak(pan = 0) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(118, now);
+          osc.frequency.linearRampToValueAtTime(74, now + 0.85);
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.value = 260;
+          g.gain.setValueAtTime(0.001, now);
+          g.gain.linearRampToValueAtTime(0.055, now + 0.25);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+          const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+          osc.connect(lp); lp.connect(g);
+          if (panner) { panner.pan.value = THREE.MathUtils.clamp(pan, -1, 1); g.connect(panner); panner.connect(this.masterGain); }
+          else g.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 1.0);
+        } catch (_) {}
+      }
+
+      playCricketChirp() {
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          const baseFreq = 3950 + Math.random() * 520;
+          osc.frequency.setValueAtTime(baseFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.06, now + 0.06);
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.022, now + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+          osc.connect(gain); gain.connect(this.ambienceGain);
+          osc.start(now); osc.stop(now + 0.14);
+        } catch (_) {}
+      }
+
+      playHeartbeat(intensity, hasAnting) {
+        try {
+          const now = this.ctx.currentTime;
+          [0, 0.15].forEach((offset, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(idx === 0 ? 66 : 48, now + offset);
+            osc.frequency.exponentialRampToValueAtTime(25, now + offset + 0.14);
+            const vol = Math.min(0.55, intensity * 0.55);
+            gain.gain.setValueAtTime(0.001, now + offset);
+            gain.gain.linearRampToValueAtTime(vol, now + offset + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
+            osc.connect(gain); gain.connect(this.masterGain);
+            osc.start(now + offset); osc.stop(now + offset + 0.16);
+          });
+          if (hasAnting && intensity > 0.25) {
+            const chime = this.ctx.createOscillator();
+            const cGain = this.ctx.createGain();
+            chime.type = 'triangle';
+            chime.frequency.setValueAtTime(920, now);
+            cGain.gain.setValueAtTime(0.001, now);
+            cGain.gain.linearRampToValueAtTime(0.05 * intensity, now + 0.02);
+            cGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+            chime.connect(cGain); cGain.connect(this.masterGain);
+            chime.start(now); chime.stop(now + 0.42);
+          }
+        } catch (_) {}
+      }
+
+      playFootstep(isSprint = false) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(84, now);
+          osc.frequency.exponentialRampToValueAtTime(28, now + 0.09);
+          gain.gain.setValueAtTime(isSprint ? 0.16 : 0.09, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.11);
+        } catch (_) {}
+      }
+
+      playWingFlap(pan = 0) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(95, now);
+          osc.frequency.exponentialRampToValueAtTime(34, now + 0.32);
+          gain.gain.setValueAtTime(0.26, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.connect(gain);
+          if (panner) { panner.pan.value = THREE.MathUtils.clamp(pan, -1, 1); gain.connect(panner); panner.connect(this.masterGain); }
+          else gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.36);
+        } catch (_) {}
+      }
+
+      playWhisperSpatial(pan = 0, pitchShift = 1.0) {
+        if (!this.isStarted || !this.ctx || this.mutedForFinale) return;
+        try {
+          const now = this.ctx.currentTime;
+          const len = Math.floor(this.ctx.sampleRate * 1.45);
+          const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.sin((i / len) * Math.PI);
+          const src = this.ctx.createBufferSource();
+          src.buffer = buf;
+          const bp = this.ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.setValueAtTime(940 * pitchShift, now);
+          bp.frequency.linearRampToValueAtTime(1480 * pitchShift, now + 0.65);
+          bp.frequency.linearRampToValueAtTime(680 * pitchShift, now + 1.4);
+          bp.Q.value = 4.6;
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.24, now + 0.35);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.42);
+          const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+          src.connect(bp); bp.connect(gain);
+          if (panner) { panner.pan.value = THREE.MathUtils.clamp(pan, -1, 1); gain.connect(panner); panner.connect(this.masterGain); }
+          else gain.connect(this.masterGain);
+          src.start(now); src.stop(now + 1.45);
+        } catch (_) {}
+      }
+
+      playSupernaturalDrone(duration = 4.5) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          [42, 55, 62.5].forEach((freq) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now);
+            osc.frequency.linearRampToValueAtTime(freq * 0.78, now + duration);
+            const lp = this.ctx.createBiquadFilter();
+            lp.type = 'lowpass';
+            lp.frequency.setValueAtTime(120, now);
+            lp.frequency.linearRampToValueAtTime(340, now + duration);
+            g.gain.setValueAtTime(0.001, now);
+            g.gain.linearRampToValueAtTime(0.18, now + 1.2);
+            g.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            osc.connect(lp); lp.connect(g); g.connect(this.masterGain);
+            osc.start(now); osc.stop(now + duration + 0.05);
+          });
+        } catch (_) {}
+      }
+
+      playAswangMorph() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(420, now + 1.1);
+          osc.frequency.exponentialRampToValueAtTime(85, now + 2.4);
+          g.gain.setValueAtTime(0.001, now);
+          g.gain.linearRampToValueAtTime(0.28, now + 0.6);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+          osc.connect(g); g.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 2.55);
+        } catch (_) {}
+      }
+
+      playFlashlightClick() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(1150, now);
+          osc.frequency.exponentialRampToValueAtTime(320, now + 0.035);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.045);
+        } catch (_) {}
+      }
+
+      playWeaponSwing(type) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type === 'asin' ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(type === 'krus' ? 680 : 520, now);
+          osc.frequency.exponentialRampToValueAtTime(95, now + 0.22);
+          gain.gain.setValueAtTime(0.24, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.25);
+        } catch (_) {}
+      }
+
+      playWeaponDrop() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(210, now);
+          osc.frequency.exponentialRampToValueAtTime(65, now + 0.14);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.16);
+        } catch (_) {}
+      }
+
+      playJumpscareStinger(loud = false) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          [98, 138.59, 466.16, 932.33, 1318.5].forEach((freq) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now);
+            osc.frequency.linearRampToValueAtTime(freq * 0.58, now + 1.35);
+            gain.gain.setValueAtTime(loud ? 0.36 : 0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+            osc.connect(gain); gain.connect(this.masterGain);
+            osc.start(now); osc.stop(now + 1.45);
+          });
+        } catch (_) {}
+      }
+
+      playScareBoom() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+          o.type = 'sine'; o.frequency.setValueAtTime(110, now); o.frequency.exponentialRampToValueAtTime(22, now + 0.9);
+          g.gain.setValueAtTime(0.9, now); g.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+          o.connect(g); g.connect(this.masterGain); o.start(now); o.stop(now + 1.05);
+          const len = Math.floor(this.ctx.sampleRate * 0.5), buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate), d = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+          const src = this.ctx.createBufferSource(), ng = this.ctx.createGain(); src.buffer = buf; ng.gain.value = 0.5;
+          src.connect(ng); ng.connect(this.masterGain); src.start(now);
+        } catch (_) {}
+      }
+
+      playCreatureScreech() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(920, now);
+          osc.frequency.exponentialRampToValueAtTime(210, now + 0.55);
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.62);
+        } catch (_) {}
+      }
+    }
+
+    /* ------------------------------------------------------------------------
+       PROCEDURAL TEXTURES & 3D MODELS (CONSISTENT WITH CHAPTERS 1 & 2)
+       ------------------------------------------------------------------------ */
+    function createProceduralTexture(type) {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      if (type === 'mud' || type === 'forest_floor') {
+        ctx.fillStyle = type === 'forest_floor' ? '#17140f' : '#241c15';
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 3400; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? (type === 'forest_floor' ? 'rgba(36, 44, 24, 0.45)' : 'rgba(56, 44, 32, 0.45)') : 'rgba(10, 9, 6, 0.62)';
+          ctx.beginPath(); ctx.arc(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (type === 'wood_plank') {
+        ctx.fillStyle = '#2d1e12'; ctx.fillRect(0, 0, 256, 256);
+        for (let y = 0; y < 256; y += 32) {
+          ctx.fillStyle = (y / 32) % 2 === 0 ? '#362416' : '#26190f';
+          ctx.fillRect(0, y, 256, 30);
+          ctx.fillStyle = '#140c07';
+          ctx.fillRect(0, y + 30, 256, 2);
+        }
+      } else if (type === 'bark') {
+        ctx.fillStyle = '#211710'; ctx.fillRect(0, 0, 256, 256);
+        for (let x = 0; x < 256; x += 6) {
+          ctx.fillStyle = Math.random() > 0.45 ? '#140d08' : '#312318';
+          ctx.fillRect(x, 0, 3 + Math.random() * 4, 256);
+        }
+      } else if (type === 'bamboo') {
+        ctx.fillStyle = '#5a5233'; ctx.fillRect(0, 0, 256, 256);
+        for (let x = 0; x < 256; x += 16) {
+          ctx.fillStyle = x % 32 === 0 ? '#4a4328' : '#685f3c';
+          ctx.fillRect(x, 0, 14, 256);
+        }
+      } else if (type === 'nipa') {
+        ctx.fillStyle = '#3b2e1e'; ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 850; i++) {
+          const x = Math.random() * 256, y = Math.random() * 256;
+          ctx.strokeStyle = Math.random() > 0.4 ? '#524029' : '#261d12';
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 14, y + 24); ctx.stroke();
+        }
+      } else {
+        ctx.fillStyle = '#383a3c'; ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 1600; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? 'rgba(72,76,74,0.42)' : 'rgba(26,28,28,0.52)';
+          ctx.fillRect(Math.random() * 256, Math.random() * 256, 6, 6);
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createWeapon3DModel(type) {
+      const group = new THREE.Group();
+      if (type === 'sulo') {
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.85, 8), new THREE.MeshStandardMaterial({ color: 0x4a3219, roughness: 0.9 }));
+        const rag = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 0.22, 8), new THREE.MeshStandardMaterial({ color: 0x261a12, roughness: 1 }));
+        rag.position.y = 0.42;
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.26, 7), new THREE.MeshBasicMaterial({ color: 0xff8c1a }));
+        flame.position.y = 0.6;
+        group.add(stick, rag, flame);
+      } else if (type === 'krus') {
+        const vBar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.56, 0.04), new THREE.MeshStandardMaterial({ color: 0x8b6914, metalness: 0.8, roughness: 0.3, emissive: 0x3b2a04 }));
+        const hBar = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 0.04), new THREE.MeshStandardMaterial({ color: 0x8b6914, metalness: 0.8, roughness: 0.3, emissive: 0x3b2a04 }));
+        hBar.position.y = 0.12;
+        group.add(vBar, hBar);
+      } else if (type === 'punyal') {
+        const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, 0.18, 8), new THREE.MeshStandardMaterial({ color: 0x3a1c12 }));
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.025, 0.04), new THREE.MeshStandardMaterial({ color: 0xc9a66b, metalness: 0.85 }));
+        guard.position.y = 0.1;
+        const blade = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.48, 4), new THREE.MeshStandardMaterial({ color: 0xd0d8e0, metalness: 0.9, roughness: 0.2 }));
+        blade.position.y = 0.35;
+        group.add(grip, guard, blade);
+      } else if (type === 'agimat') {
+        const cord = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.01, 6, 16), new THREE.MeshStandardMaterial({ color: 0x2a1c12 }));
+        const medal = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), new THREE.MeshStandardMaterial({ color: 0xd4af37, emissive: 0x5c4208, metalness: 0.85 }));
+        medal.position.y = -0.09;
+        group.add(cord, medal);
+      } else {
+        // Banal na Asin (Salt Pouch / Bowl)
+        const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.055, 0.09, 10), new THREE.MeshStandardMaterial({ color: 0x5c3824 }));
+        const salt = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.06, 10), new THREE.MeshStandardMaterial({ color: 0xf4f4f8, emissive: 0x222630 }));
+        salt.position.y = 0.05;
+        group.add(bowl, salt);
+      }
+      return group;
+    }
+
+    function buildFirstPersonArms(targetCamera) {
+      const viewModelGroup = new THREE.Group();
+      targetCamera.add(viewModelGroup);
+      const sleeveMat = new THREE.MeshStandardMaterial({ color: 0x354539, roughness: 0.85 });
+      const skinArmMat = new THREE.MeshStandardMaterial({ color: 0x946748, roughness: 0.68 });
+
+      function buildArmRig(side = 'right') {
+        const sign = side === 'right' ? 1 : -1;
+        const armPivot = new THREE.Group();
+        armPivot.position.set(sign * 0.34, -0.35, -0.44);
+        armPivot.rotation.set(0.32, -sign * 0.14, sign * 0.08);
+        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.055, 0.32, 10), sleeveMat);
+        sleeve.rotation.x = Math.PI / 2 - 0.18; sleeve.position.set(0, -0.05, 0.14);
+        const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.042, 0.16, 10), skinArmMat);
+        forearm.rotation.x = Math.PI / 2 - 0.12; forearm.position.set(0, -0.01, -0.05);
+        const handGroup = new THREE.Group();
+        handGroup.position.set(0, 0.0, -0.14);
+        const palm = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.036, 0.085), skinArmMat);
+        handGroup.add(palm);
+        armPivot.add(sleeve, forearm, handGroup);
+        return { root: armPivot, handGroup };
+      }
+
+      const rightArmRig = buildArmRig('right');
+      const leftArmRig = buildArmRig('left');
+      leftArmRig.root.position.set(-0.28, -0.41, -0.48);
+      leftArmRig.root.rotation.set(0.45, 0.22, -0.12);
+      viewModelGroup.add(rightArmRig.root, leftArmRig.root);
+
+      const fpFlashlightBody = new THREE.Group();
+      const torchBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.02, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0x1d2229, metalness: 0.8 }));
+      torchBarrel.rotation.x = Math.PI / 2;
+      fpFlashlightBody.add(torchBarrel);
+      fpFlashlightBody.position.set(0, -0.015, -0.055);
+      leftArmRig.handGroup.add(fpFlashlightBody);
+
+      const fpWeapons = {
+        sulo: createWeapon3DModel('sulo'),
+        krus: createWeapon3DModel('krus'),
+        punyal: createWeapon3DModel('punyal'),
+        agimat: createWeapon3DModel('agimat'),
+        asin: createWeapon3DModel('asin')
+      };
+      const GRIP = {
+        sulo:   { gy: -0.28, rx: -0.85, rz: 0.10, s: 0.72 },
+        krus:   { gy: -0.12, rx: -0.35, rz: 0.0,  s: 0.92 },
+        punyal: { gy: -0.04, rx: -1.15, rz: 0.15, s: 0.85 },
+        agimat: { gy: 0.0,   rx: -0.25, rz: 0.0,  s: 1.60 },
+        asin:   { gy: 0.0,   rx: -0.10, rz: 0.0,  s: 1.45 }
+      };
+      Object.keys(fpWeapons).forEach(k => {
+        const m = fpWeapons[k], c = GRIP[k], holder = new THREE.Group();
+        m.position.y = -c.gy; holder.add(m);
+        holder.visible = false; holder.scale.setScalar(c.s);
+        holder.position.set(0, 0.03, -0.06); holder.rotation.set(c.rx, 0, c.rz);
+        rightArmRig.handGroup.add(holder);
+        fpWeapons[k] = holder;
+      });
+
+      const suloHandLight = new THREE.PointLight(0xff7b1c, 0, 15, 1.4);
+      suloHandLight.position.set(0.35, -0.1, -0.65);
+      viewModelGroup.add(suloHandLight);
+
+      return { viewModelGroup, rightArmRig, leftArmRig, fpFlashlightBody, fpWeapons, suloHandLight };
+    }
+
+    /* ------------------------------------------------------------------------
+       BUILD MATEO (HUMAN FORM -> ASWANG TRANSFORMATION RIG)
+       ------------------------------------------------------------------------ */
+    function createMateoEntity() {
+      const root = new THREE.Group();
+
+      const shirtMat = new THREE.MeshStandardMaterial({ color: 0x26323d, roughness: 0.85 });
+      const pantsMat = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.9 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0x8f6548, roughness: 0.65 });
+      const hairMat = new THREE.MeshStandardMaterial({ color: 0x0e0c0b, roughness: 0.95 });
+
+      const legs = new THREE.Group();
+      const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.85, 8), pantsMat);
+      legL.position.set(-0.11, 0.425, 0);
+      const legR = legL.clone(); legR.position.x = 0.11;
+      legs.add(legL, legR);
+
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.17, 0.68, 10), shirtMat);
+      torso.position.set(0, 1.18, 0);
+
+      // Arms (elongate during Aswang transformation)
+      const armL = new THREE.Group();
+      armL.position.set(-0.26, 1.45, 0);
+      const armMeshL = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.62, 8), skinMat);
+      armMeshL.position.y = -0.28;
+      const clawL = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.22, 5), new THREE.MeshBasicMaterial({ color: 0x1a0404 }));
+      clawL.position.y = -0.64; clawL.visible = false;
+      armL.add(armMeshL, clawL);
+
+      const armR = new THREE.Group();
+      armR.position.set(0.26, 1.45, 0);
+      const armMeshR = armMeshL.clone();
+      const clawR = clawL.clone();
+      armR.add(armMeshR, clawR);
+
+      // Head & Face (distorts into Aswang visage)
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0, 1.68, 0);
+      const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.165, 16, 14), skinMat);
+      const hairMesh = new THREE.Mesh(new THREE.SphereGeometry(0.172, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), hairMat);
+      hairMesh.position.y = 0.02;
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x14100d });
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 8), eyeMat);
+      eyeL.position.set(-0.058, 0.02, 0.148);
+      const eyeR = eyeL.clone(); eyeR.position.x = 0.058;
+
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.015, 0.02), new THREE.MeshBasicMaterial({ color: 0x1e0707 }));
+      mouth.position.set(0, -0.06, 0.152);
+
+      // Aswang fangs & dark veins
+      const fangL = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.055, 5), new THREE.MeshBasicMaterial({ color: 0xf2ece1 }));
+      fangL.position.set(-0.028, -0.075, 0.158); fangL.rotation.x = Math.PI; fangL.visible = false;
+      const fangR = fangL.clone(); fangR.position.x = 0.028;
+
+      // Shadow aura tendrils for Aswang reveal
+      const shadowAura = new THREE.Mesh(
+        new THREE.ConeGeometry(0.65, 2.1, 10, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0x050202, transparent: true, opacity: 0.0, side: THREE.DoubleSide })
+      );
+      shadowAura.position.y = 1.05;
+
+      headGroup.add(headMesh, hairMesh, eyeL, eyeR, mouth, fangL, fangR);
+      root.add(legs, torso, armL, armR, headGroup, shadowAura);
+
+      return {
+        root, torso, headGroup, headMesh, skinMat, eyeMat, eyeL, eyeR,
+        mouth, fangL, fangR, armL, armR, clawL, clawR, shadowAura
+      };
+    }
+
+    /* ------------------------------------------------------------------------
+       RENDERER, DIFFICULTY & SAVE SYSTEM
+       ------------------------------------------------------------------------ */
+      function makeSkinTexture(base, wrinkle) {
+        const c = document.createElement('canvas'); c.width = c.height = 128;
+        const x = c.getContext('2d');
+        x.fillStyle = base; x.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 260; i++) {
+          x.fillStyle = 'rgba(' + (Math.random() < 0.5 ? '20,18,14' : '150,150,125') + ',' + (0.05 + Math.random() * 0.1) + ')';
+          x.beginPath(); x.arc(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 9, 0, 7); x.fill();
+        }
+        x.strokeStyle = wrinkle; x.lineWidth = 1;
+        for (let i = 0; i < 40; i++) {
+          let px = Math.random() * 128, py = Math.random() * 128;
+          x.beginPath(); x.moveTo(px, py);
+          for (let k = 0; k < 4; k++) { px += Math.random() * 14 - 7; py += Math.random() * 5; x.lineTo(px, py); }
+          x.stroke();
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+      function buildFace(r, o = {}) {
+        const demon = !!o.demon;
+        const mat = (c, rough = 0.6) => new THREE.MeshStandardMaterial({ color: c, roughness: rough });
+        const basic = (c) => new THREE.MeshBasicMaterial({ color: c });
+        const skin = o.skinMat || mat(o.skin, 0.7);
+        const g = new THREE.Group();
+        const f = { group: g, r, eyes: [], pupils: [], brows: [], blink: 1, blinkT: 2, open: 0, mood: 0 };
+        for (const s of [-1, 1]) {
+          const eye = new THREE.Group();
+          eye.position.set(s * r * 0.38, r * 0.1, r * 0.86);
+          eye.rotation.y = s * 0.28;
+          const white = new THREE.Mesh(new THREE.SphereGeometry(r * 0.17, 14, 10), demon ? basic(o.eyeColor || 0xff2a2a) : mat(0xf2efe8, 0.3));
+          white.scale.set(1, demon ? 0.55 : o.sharp ? 0.7 : 0.85, 0.55);
+          eye.add(white);
+          if (demon) { const sk = new THREE.Mesh(new THREE.SphereGeometry(r * 0.23, 10, 8), mat(0x15130f, 0.9)); sk.scale.set(1, 0.8, 0.5); sk.position.z = -r * 0.04; eye.add(sk); }
+          if (!demon) {
+            const pu = new THREE.Group();
+            pu.position.z = r * 0.07;
+            const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 0.095, 12, 10), mat(0x3a2414, 0.25));
+            iris.scale.z = 0.5;
+            const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.05, 10, 8), basic(0x050403));
+            pupil.position.z = r * 0.03;
+            const glint = new THREE.Mesh(new THREE.SphereGeometry(r * 0.017, 6, 6), basic(0xffffff));
+            glint.position.set(r * 0.03, r * 0.035, r * 0.06);
+            pu.add(iris, pupil, glint);
+            eye.add(pu);
+            f.pupils.push(pu);
+          }
+          const brow = new THREE.Mesh(new THREE.BoxGeometry(r * (demon ? 0.4 : 0.32), r * (demon ? 0.09 : o.sharp ? 0.075 : 0.055), r * 0.08), mat(o.browColor || o.hair || 0x120c08, 0.9));
+          brow.position.set(s * r * 0.4, r * 0.34, r * 0.88);
+          brow.userData = { s, y: r * 0.34 };
+          const ear = new THREE.Mesh(demon ? new THREE.ConeGeometry(r * 0.15, r * 0.65, 5) : new THREE.SphereGeometry(r * 0.2, 8, 8), skin);
+          if (demon) { ear.position.set(s * r * 1.0, r * 0.12, -r * 0.1); ear.rotation.z = -s * 1.2; }
+          else { ear.position.set(s * r * 0.97, 0, -r * 0.05); ear.scale.set(0.4, 1, 0.7); }
+          f.eyes.push(eye); f.brows.push(brow);
+          g.add(eye, brow, ear);
+        }
+        const nose = new THREE.Mesh(demon ? new THREE.SphereGeometry(r * 0.13, 8, 6) : new THREE.ConeGeometry(r * 0.1, r * 0.3, 8), skin);
+        if (demon) { // flat bat-like nose, sunken hollow cheeks with sharp cheekbones
+          nose.scale.set(1.3, 0.75, 0.8); nose.position.set(0, -r * 0.12, r * 0.97);
+          for (const s of [-1, 1]) {
+            const n = new THREE.Mesh(new THREE.SphereGeometry(r * 0.035, 6, 6), basic(0x050403)); n.position.set(s * r * 0.07, -r * 0.15, r * 1.05);
+            const cb = new THREE.Mesh(new THREE.SphereGeometry(r * 0.2, 8, 6), skin); cb.scale.set(1, 0.7, 0.7); cb.position.set(s * r * 0.52, -r * 0.1, r * 0.72);
+            const hol = new THREE.Mesh(new THREE.SphereGeometry(r * 0.2, 8, 6), mat(0x2c2a24, 1)); hol.scale.set(0.9, 1, 0.35); hol.position.set(s * r * 0.45, -r * 0.38, r * 0.78);
+            g.add(n, cb, hol);
+          }
+        } else { nose.rotation.x = Math.PI / 2; nose.position.set(0, -r * 0.05, r * 0.98); }
+        g.add(nose);
+        if (o.sharp && !demon) { // defined nose + cheekbones
+          nose.scale.set(0.9, 1.3, 1.1);
+          for (const s of [-1, 1]) { const st = new THREE.Mesh(new THREE.SphereGeometry(r * 0.04, 6, 6), basic(0xe8e8f0)); st.position.set(s * r * 1.03, -r * 0.17, -r * 0.04); g.add(st); }
+          for (const s of [-1, 1]) { const cb = new THREE.Mesh(new THREE.SphereGeometry(r * 0.2, 8, 6), skin); cb.scale.set(1, 0.55, 0.6); cb.position.set(s * r * 0.54, -r * 0.08, r * 0.76); cb.userData.cb = 1; g.add(cb); }
+        }
+        // mouth: fixed upper lip, moving jaw, dark cavity between
+        const w = r * (demon ? 0.75 : 0.4);
+        const mouth = new THREE.Group();
+        mouth.position.set(0, -r * 0.45, r * 0.85);
+        const lipMat = mat(demon ? 0x3a0d10 : 0x7a3b30, 0.5);
+        const upper = new THREE.Mesh(new THREE.BoxGeometry(w, r * (o.sharp ? 0.07 : 0.045), r * 0.06), lipMat);
+        const lower = upper.clone();
+        const jaw = new THREE.Group();
+        jaw.add(lower);
+        f.cavity = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, r * (demon ? 0.45 : 0.2), r * 0.08), basic(demon ? 0x2a0608 : 0x120405));
+        f.cavH = r * (demon ? 0.45 : 0.2);
+        mouth.add(f.cavity, upper, jaw);
+        if (demon) {
+          const toothMat = mat(0xd8d0b8, 0.4);
+          for (let i = 0; i < 11; i++) {
+            const fang = i === 2 || i === 8;
+            const len = r * (fang ? 0.22 : 0.07 + Math.random() * 0.05), x = (i / 10 - 0.5) * w * 0.92;
+            const tu = new THREE.Mesh(new THREE.ConeGeometry(r * (fang ? 0.04 : 0.025), len, 5), toothMat);
+            tu.rotation.x = Math.PI; tu.position.set(x, -len / 2 - r * 0.02, r * 0.01);
+            const tl = new THREE.Mesh(new THREE.ConeGeometry(r * (fang ? 0.035 : 0.025), len * 0.9, 5), toothMat);
+            tl.position.set(x, len * 0.45 + r * 0.02, r * 0.01);
+            mouth.add(tu); jaw.add(tl);
+          }
+          const chin = new THREE.Mesh(new THREE.SphereGeometry(r * 0.3, 8, 6), skin);
+          chin.scale.set(1.1, 0.9, 0.9); chin.position.set(0, -r * 0.1, -r * 0.15); jaw.add(chin);
+        }
+        f.jaw = jaw;
+        g.add(mouth);
+        if (o.hair && !demon) {
+          const hair = new THREE.Mesh(new THREE.SphereGeometry(r * (o.sharp ? 1.03 : 1.06), 14, 10, 0, Math.PI * 2, 0, Math.PI * (o.sharp ? 0.46 : 0.5)), mat(o.hair, 0.95));
+          hair.rotation.x = o.sharp ? -0.45 : -0.6;
+          g.add(hair);
+        }
+        if (demon) { // long stringy hair mass hanging behind the head
+          const hair = new THREE.Mesh(new THREE.ConeGeometry(r * 1.1, r * 3.4, 8, 1, true), new THREE.MeshStandardMaterial({ color: 0x050405, roughness: 1, side: THREE.DoubleSide }));
+          hair.rotation.x = Math.PI;
+          hair.position.set(0, -r * 1.0, -r * 0.75);
+          g.add(hair);
+          const hm = new THREE.MeshStandardMaterial({ color: 0x07060a, roughness: 0.8, side: THREE.DoubleSide });
+          const cap = new THREE.Mesh(new THREE.SphereGeometry(r * 1.07, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hm);
+          cap.rotation.x = -0.6; g.add(cap);
+          for (const s of [-1, 1]) { // long straight curtains framing the face
+            const cu = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.1, r * 4, 7, 1, true), hm);
+            cu.scale.z = 0.35; cu.position.set(s * r * 0.92, -r * 1.55, -r * 0.05); cu.rotation.z = s * 0.04; g.add(cu);
+          }
+        }
+        f.lips = [upper, lower]; f.nose = nose; f.mouth = mouth;
+        if (o.sharp && !demon) f.cbs = g.children.filter(k => k.userData.cb);
+        return f;
+      }
+
+      function updateFace(f, dt, t, tgt) {
+        f.blinkT -= dt;
+        if (f.blinkT <= 0) { f.blink = 0.08; f.blinkT = 2 + Math.random() * 3.5; }
+        f.blink = Math.min(1, f.blink + dt * 9);
+        f.eyes.forEach(e => { e.scale.y = f.blink; });
+        f.open += (tgt.open - f.open) * Math.min(1, dt * 14);
+        f.mood += (tgt.mood - f.mood) * Math.min(1, dt * 6);
+        f.brows.forEach(b => {
+          b.rotation.z = b.userData.s * f.mood * 0.5;
+          b.position.y = b.userData.y - f.mood * f.r * 0.05;
+        });
+        f.cavity.scale.y = Math.max(0.02, f.open);
+        f.cavity.position.y = -f.open * f.cavH * 0.5;
+        f.jaw.position.y = -f.open * f.cavH;
+        if (f.photo) f.cavity.visible = f.open > 0.1;
+        f.pupils.forEach(p => { p.position.x = Math.sin(t * 0.7) * f.r * 0.035; p.position.y = Math.sin(t * 0.43) * f.r * 0.02; });
+      }
+
+
+    function createMateoPhoto() {
+      const mateoGroup = new THREE.Group();
+      const bodyMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.32, 1.25, 10),
+        new THREE.MeshStandardMaterial({ color: 0x3b4d3b, roughness: 0.85 })
+      );
+      bodyMesh.position.y = 0.95;
+      const headMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0x8c6244, roughness: 0.7 })
+      );
+      headMesh.position.y = 1.75;
+      const salakotHat = new THREE.Mesh(
+        new THREE.ConeGeometry(0.38, 0.22, 12),
+        new THREE.MeshStandardMaterial({ color: 0x9c7b44, roughness: 0.85 })
+      );
+      salakotHat.position.y = 1.98;
+      mateoGroup.add(bodyMesh, headMesh, salakotHat);
+      // Mateo: full body + face
+      const mTrousers = new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.9 });
+      const mSkin = new THREE.MeshStandardMaterial({ color: 0x987a78, roughness: 0.7 });
+      const mLimb = (geo, m, x, y, z, rz = 0) => { const k = new THREE.Mesh(geo, m); k.position.set(x, y, z); k.rotation.z = rz; mateoGroup.add(k); return k; };
+      function makeShirtTexture() {
+        const c = document.createElement('canvas'); c.width = c.height = 128;
+        const x = c.getContext('2d');
+        x.fillStyle = '#c9c3b3'; x.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2) { x.fillStyle = 'rgba(70,64,52,0.28)'; x.fillRect(i * 16, j * 16, 16, 16); }
+        x.fillStyle = 'rgba(30,28,24,0.5)'; x.fillRect(63, 0, 2, 128);
+        x.fillStyle = '#1c1a17';
+        for (let j = 0; j < 6; j++) { x.beginPath(); x.arc(64, 12 + j * 20, 3, 0, 7); x.fill(); }
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.offset.x = 0.5;
+        return t;
+      }
+      const shirtMat = new THREE.MeshStandardMaterial({ map: makeShirtTexture(), roughness: 0.9, flatShading: true });
+      bodyMesh.material = shirtMat;
+      const mShorts = new THREE.MeshStandardMaterial({ color: 0x1f1e1c, roughness: 0.9 });
+      const mShoe = new THREE.MeshStandardMaterial({ color: 0x151412, roughness: 0.8 });
+      for (const sx of [-1, 1]) {
+        mLimb(new THREE.CylinderGeometry(0.115, 0.105, 0.3, 8), mShorts, sx * 0.12, 0.35, 0);
+        mLimb(new THREE.CylinderGeometry(0.075, 0.06, 0.22, 8), mSkin, sx * 0.12, 0.11, 0);
+        mLimb(new THREE.BoxGeometry(0.11, 0.05, 0.24), mShoe, sx * 0.12, 0.025, 0.05);
+        mLimb(new THREE.CylinderGeometry(0.065, 0.055, 0.85, 8), mSkin, sx * 0.37, 1.05, 0, -sx * 0.1);
+        mLimb(new THREE.CylinderGeometry(0.088, 0.078, 0.3, 8), shirtMat, sx * 0.375, 1.33, 0, -sx * 0.1);
+      }
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.03, 6, 12), shirtMat);
+      collar.rotation.x = Math.PI / 2; collar.position.y = 1.57; mateoGroup.add(collar);
+      mLimb(new THREE.SphereGeometry(0.07, 8, 8), mSkin, -0.41, 0.6, 0);
+      mLimb(new THREE.SphereGeometry(0.07, 8, 8), mSkin, 0.41, 0.6, 0);
+      mLimb(new THREE.CylinderGeometry(0.09, 0.1, 0.16, 8), mSkin, 0, 1.6, 0);
+      const hg = new THREE.SphereGeometry(0.22, 16, 14), hp = hg.attributes.position;
+      for (let i = 0; i < hp.count; i++) {
+        const y = hp.getY(i) / 0.22;
+        if (y < 0) {
+          const t = Math.min(1, -y);
+          hp.setX(i, hp.getX(i) * (1 - 0.30 * Math.pow(t, 1.6)));
+          if (hp.getZ(i) > 0) hp.setZ(i, hp.getZ(i) + 0.22 * 0.12 * t * t);
+        }
+      }
+      hg.computeVertexNormals(); headMesh.geometry.dispose(); headMesh.geometry = hg;
+      headMesh.material = new THREE.MeshStandardMaterial({ map: makeSkinTexture('#987a78', 'rgba(50,28,16,0.35)'), flatShading: true, roughness: 0.8 });
+      const mateoFace = buildFace(0.22, { skin: 0x987a78, skinMat: headMesh.material, hair: 0x0c0907, sharp: true });
+      mateoFace.group.position.copy(headMesh.position);
+      mateoGroup.add(mateoFace.group);
+
+      // Photo face: project the supplied photo onto the front of Mateo's (tapered) head
+      (function () {
+        const R = 0.22, g0 = headMesh.geometry, pos = g0.attributes.position, idx = g0.index.array, keep = [];
+        const ok = i => { const x = pos.getX(i) / R, y = pos.getY(i) / R, z = pos.getZ(i) / R; return Math.abs(x) <= 0.775 && y >= -0.72 && y <= 0.8 && z > 0.2; };
+        for (let i = 0; i < idx.length; i += 3) if (ok(idx[i]) && ok(idx[i + 1]) && ok(idx[i + 2])) keep.push(idx[i], idx[i + 1], idx[i + 2]);
+        const pg = g0.clone(); pg.setIndex(keep);
+        const uv = pg.attributes.uv;
+        for (let i = 0; i < pos.count; i++) uv.setXY(i, 0.5 + 0.645 * pos.getX(i) / R, 0.586 + (pos.getY(i) / R - 0.1) * 0.624);
+        const tex = new THREE.TextureLoader().load('data:image/jpeg;base64,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');
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const patch = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0x555555, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+        patch.scale.setScalar(1.005);
+        headMesh.add(patch); mateoGroup.userData.patch = patch;
+        mateoFace.eyes.concat(mateoFace.brows, mateoFace.lips, mateoFace.cbs || [], [mateoFace.nose]).forEach(k => { k.visible = false; });
+        mateoFace.mouth.position.z = R * 0.95;
+      })();
+
+      return { group: mateoGroup, face: mateoFace, head: headMesh, patch: mateoGroup.userData.patch };
+    }
+    function createAswang() {
+      const creatureGroup = new THREE.Group();
+      creatureGroup.position.set(0, 0, -34);
+      creatureGroup.visible = false;
+
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0x241d1c, roughness: 0.65 });
+      const shawlMat = new THREE.MeshStandardMaterial({ color: 0x120e10, roughness: 0.95 });
+      const wingMat = new THREE.MeshStandardMaterial({ color: 0x1a1114, roughness: 0.85, side: THREE.DoubleSide });
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
+
+      const cTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.15, 1.35, 8), shawlMat);
+      cTorso.position.y = 1.35;
+      cTorso.rotation.x = 0.22;
+      const cHead = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), skinMat);
+      cHead.position.set(0, 2.12, 0.22);
+
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 6), eyeMat);
+      eyeL.position.set(-0.08, 2.16, 0.42);
+      const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 6), eyeMat);
+      eyeR.position.set(0.08, 2.16, 0.42);
+
+      const leftWing = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.35, 4), wingMat);
+      leftWing.position.set(-0.52, 1.65, -0.18);
+      leftWing.rotation.set(0.3, 0.2, 0.75);
+      const rightWing = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.35, 4), wingMat);
+      rightWing.position.set(0.52, 1.65, -0.18);
+      rightWing.rotation.set(0.3, -0.2, -0.75);
+
+      const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.025, 1.55, 6), skinMat);
+      leftArm.position.set(-0.36, 1.22, 0.32);
+      leftArm.rotation.x = -0.75;
+      const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.025, 1.55, 6), skinMat);
+      rightArm.position.set(0.36, 1.22, 0.32);
+      rightArm.rotation.x = -0.75;
+
+      creatureGroup.add(cTorso, cHead, eyeL, eyeR, leftWing, rightWing, leftArm, rightArm);
+      eyeL.visible = eyeR.visible = false; // replaced by the full face below
+      // gaunt grey-green skin, faceted low-poly shading
+      skinMat.map = makeSkinTexture('#8d8b7a', 'rgba(25,22,18,0.5)');
+      skinMat.color.set(0xd0cebb); skinMat.flatShading = true; skinMat.needsUpdate = true;
+      cTorso.material = skinMat;
+      const creatureFace = buildFace(0.24, { demon: true, skin: 0x241d1c, skinMat, eyeColor: 0xfff0b8, browColor: 0x4a4840 });
+      // bat wings: membrane with finger bones
+      const boneMat = new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.7 });
+      const clawMat = new THREE.MeshStandardMaterial({ color: 0x8a5a58, roughness: 0.4 });
+      function wingGeo(s) {
+        const Wp = [0, 0.55], T = [[0.1, 0.95], [-0.6, 0.72], [-0.72, 0], [-0.48, -0.5]], R = [0, -0.65], F4 = [0.42, -0.12];
+        const m = (a, b) => [Wp[0] + ((a[0] + b[0]) / 2 - Wp[0]) * 0.8, Wp[1] + ((a[1] + b[1]) / 2 - Wp[1]) * 0.8];
+        const ring = [T[0], T[1], m(T[1], T[2]), T[2], m(T[2], T[3]), T[3], m(T[3], R), R, F4, m(F4, T[0])];
+        const v = [Wp[0] * s, Wp[1], 0], idx = [];
+        ring.forEach(q => v.push(q[0] * s, q[1], 0));
+        for (let i = 0; i < ring.length; i++) idx.push(0, i + 1, ((i + 1) % ring.length) + 1);
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex(idx); g.computeVertexNormals();
+        return { g, Wp, T, R };
+      }
+      function wingBone(a, b, s, rad) {
+        const dx = (b[0] - a[0]) * s, dy = b[1] - a[1];
+        const k = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.6, rad, Math.hypot(dx, dy), 5), boneMat);
+        k.position.set(a[0] * s + dx / 2, (a[1] + b[1]) / 2, 0.005); k.rotation.z = Math.atan2(-dx, dy);
+        return k;
+      }
+      [[leftWing, 1], [rightWing, -1]].forEach(([w, s]) => {
+        const d = wingGeo(s);
+        w.geometry.dispose(); w.geometry = d.g; w.scale.set(1.35, 1.35, 1);
+        w.add(wingBone(d.R, d.Wp, s, 0.03));
+        d.T.forEach(t => w.add(wingBone(d.Wp, t, s, 0.022)));
+      });
+      // clawed hands
+      [leftArm, rightArm].forEach(a => {
+        const palm = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), skinMat);
+        palm.scale.set(1.3, 0.6, 1.1); palm.position.y = -0.8; a.add(palm);
+        for (let i = 0; i < 4; i++) {
+          const c = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.3, 4), clawMat);
+          c.position.set((i - 1.5) * 0.04, -0.93, 0); c.rotation.z = Math.PI + (i - 1.5) * 0.14; a.add(c);
+        }
+      });
+      cHead.add(creatureFace.group);
+      return { group: creatureGroup, face: creatureFace, leftWing, rightWing };
+    }
+
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+
+    const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 175);
+    camera.rotation.order = 'YXZ';
+
+    const audio = new HorrorAudioEngine();
+    const textures = {
+      mud: createProceduralTexture('mud'),
+      forestFloor: createProceduralTexture('forest_floor'),
+      wood: createProceduralTexture('wood_plank'),
+      bark: createProceduralTexture('bark'),
+      bamboo: createProceduralTexture('bamboo'),
+      nipa: createProceduralTexture('nipa'),
+      stone: createProceduralTexture('stone')
+    };
+    textures.mud.repeat.set(32, 32);
+    textures.forestFloor.repeat.set(44, 44);
+    textures.wood.repeat.set(4, 4);
+
+    const DIFFS = {
+      easy: { id: 'easy', dmg: 0.65, speed: 3.1, batt: 0.2, hint: 2, desc: 'MADALI — Mas malinaw ang gabay sa mga pahiwatig at mas mahina ang pinsala ng mga nilalang.' },
+      medium: { id: 'medium', dmg: 1.0, speed: 3.9, batt: 0.34, hint: 1, desc: 'KATAMTAMAN — Balanseng imbestigasyon at matinding takot sa bawat silid.' },
+      expert: { id: 'expert', dmg: 1.45, speed: 4.5, batt: 0.46, hint: 0, desc: 'EKSPERTO — Walang distansya sa gabay. Mabilis at mapanganib ang bawat pagtatagpo.' }
+    };
+
+    let selectedDifficulty = 'medium';
+    function applyDifficultyUI(id) {
+      selectedDifficulty = id;
+      const d = DIFFS[id] || DIFFS.medium;
+      document.querySelectorAll('.d-btn').forEach(b => b.classList.toggle('active', b.dataset.d === d.id));
+      document.getElementById('diff-desc').textContent = d.desc;
+    }
+    document.querySelectorAll('.d-btn').forEach(b => b.addEventListener('click', () => applyDifficultyUI(b.dataset.d)));
+    applyDifficultyUI('medium');
+
+    document.querySelectorAll('.q-btn').forEach(btn => btn.addEventListener('click', () => {
+      const preset = btn.dataset.q;
+      document.querySelectorAll('.q-btn').forEach(b => b.classList.toggle('active', b.dataset.q === preset));
+      renderer.setPixelRatio(preset === 'low' ? 1 : Math.min(window.devicePixelRatio || 1, preset === 'medium' ? 1.5 : 2));
+      renderer.shadowMap.enabled = preset !== 'low';
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }));
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const SAVE_KEY = 'kasuma_ch3_part1_finale_save';
+    function saveProgress(payload) {
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ ...payload, timestamp: Date.now() }));
+        showToast('Nai-save ang checkpoint sa Chapter 3!');
+        refreshLoadBtn();
+      } catch (_) {}
+    }
+    function loadProgress() {
+      try { const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+    }
+    function refreshLoadBtn() {
+      const btn = document.getElementById('load-save-btn');
+      if (btn) btn.style.display = loadProgress() ? 'inline-block' : 'none';
+    }
+    refreshLoadBtn();
+
+    /* ------------------------------------------------------------------------
+       LAUNCH CHAPTER 3 — ANG LIHIM SA LIKOD NG MGA ALAALA
+       ------------------------------------------------------------------------ */
+    let activeCleanup = null;
+
+    function launchChapter3(savedState = null) {
+      if (activeCleanup) activeCleanup();
+      const timers = new Set();
+      const later = (fn, ms) => { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); return id; };
+      audio.mutedForFinale = false;
+      if (audio.masterGain) { audio.masterGain.gain.cancelScheduledValues(0); audio.masterGain.gain.value = 0.84; }
+
+      const diffId = savedState?.difficulty || selectedDifficulty || 'medium';
+      const DIFF = DIFFS[diffId] || DIFFS.medium;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x080c0d);
+      scene.fog = new THREE.FogExp2(0x090e10, 0.032);
+
+      camera.children.slice().forEach(c => camera.remove(c));
+      scene.add(camera);
+      const rig = buildFirstPersonArms(camera);
+
+      scene.add(new THREE.HemisphereLight(0x3a4d5c, 0x1a130c, 0.85));
+      scene.add(new THREE.AmbientLight(0x28323b, 0.36));
+      const moonLight = new THREE.DirectionalLight(0x88a8c4, 0.95);
+      moonLight.position.set(24, 52, -30);
+      moonLight.castShadow = false;
+      scene.add(moonLight);
+
+      const flashlight = new THREE.SpotLight(0xfff1d6, 7.6, 38, Math.PI / 5.2, 0.45, 1.1);
+      const flashlightTarget = new THREE.Object3D();
+      scene.add(flashlight, flashlightTarget);
+      flashlight.target = flashlightTarget;
+
+      // Dedicated dramatic spotlight for the Final Mateo Aswang Reveal
+      const revealLight = new THREE.PointLight(0xd93829, 0, 9, 1.4);
+      scene.add(revealLight);
+
+      // Jumpscare: mukha ng aswang (Chapter 1) na sumusugod sa screen
+      const scarePropGroup = new THREE.Group();
+      scarePropGroup.visible = false;
+      const scareAswang = createAswang();
+      scareAswang.group.position.set(0, 0, 0); scareAswang.group.visible = true;
+      scarePropGroup.add(scareAswang.group);
+      const scareLight = new THREE.PointLight(0xff5a44, 0, 5, 1.5);
+      scareLight.position.set(0, 0.35, 0.2); camera.add(scareLight);
+      camera.add(scarePropGroup);
+
+      const state = {
+        isPlaying: true, isPaused: false, isCinematic: true, isNoteOpen: false, isGameOver: false,
+        pos: new THREE.Vector3(0, 1.72, 54), yaw: 0, pitch: 0.01,
+        hp: savedState?.hp ?? 100, stamina: 100, battery: savedState?.battery ?? 90,
+        flashlightOn: true, isCrouching: false, isSprinting: false, bobTimer: 0, stepTimer: 0,
+        ownedWeapons: {
+          sulo: savedState?.ownedWeapons?.sulo ?? true,
+          krus: savedState?.ownedWeapons?.krus ?? false,
+          punyal: savedState?.ownedWeapons?.punyal ?? false,
+          agimat: savedState?.ownedWeapons?.agimat ?? false,
+          asin: savedState?.ownedWeapons?.asin ?? false
+        },
+        equippedWeapon: savedState?.equippedWeapon ?? 'sulo',
+        attackCooldown: 0, swingAnim: 0, saltWardTimer: 0,
+        act: 1, evidenceCount: 0,
+        ancestralRoomUnlocked: false, chapelAltarSolved: false, ritualChamberEntered: false,
+        finalTriggered: false, finalePhase: 0, finaleTimer: 0,
+        shake: 0, jumpscareTimer: 0, jumpscareCooldown: 6.0, whisperTimer: 8.5,
+        memoryFlashTimer: 0, flickerT: 0, morphed: false
+      };
+
+      const ACTS = {
+        1: { label: 'ACT I • ANG PAGTAKAS', title: 'Siyasatin ang liblib na pamayanan at lumang bahay', sub: 'Nakalabas ka na sa bundok, ngunit tila pamilyar ang nayong ito.' },
+        2: { label: 'ACT II • ANG MGA NAWAWALANG ALAALA', title: 'Buksan ang Silid-Angkan sa Lumang Bahay-Kahoy', sub: 'Hanapin ang mga dokumento at lumang larawan tungkol sa nakaraan.' },
+        3: { label: 'ACT III • ANG TOTOONG DAHILAN', title: 'Lutasin ang Altar ng mga Larawan sa Nakalimutang Kapilya', sub: 'Dumaan sa sementeryo patungo sa kapilya at ayusin ang pagkakasunod ng mga taon.' },
+        4: { label: 'ACT IV • ANG PAGKAKATAO NI MATEO', title: 'Bumaba sa Lihim na Silid-Ritwal sa ilalim ng lupa', sub: 'Siyasatin ang dambana sa gitna ng silid-ritwal.' }
+      };
+
+      function setAct(actNum) {
+        if (actNum <= state.act && actNum !== 1) return;
+        state.act = actNum;
+        const a = ACTS[actNum];
+        if (!a) return;
+        document.getElementById('objective-label').textContent = a.label;
+        document.getElementById('objective-text').textContent = a.title;
+        document.getElementById('objective-sub').textContent = DIFF.hint === 0 ? '' : a.sub;
+      }
+
+      function triggerMemoryFlash(duration = 1.6) {
+        state.memoryFlashTimer = duration;
+        document.getElementById('memory-overlay').style.opacity = '0.9';
+        audio.playWhisperSpatial(Math.random() > 0.5 ? 0.7 : -0.7, 0.92);
+        later(() => { document.getElementById('memory-overlay').style.opacity = '0'; }, duration * 1000);
+      }
+
+      function triggerJumpscare(kind = 'soul', hpDamage = 12, message = '') {
+        if (state.isGameOver || state.isPaused || state.isCinematic || state.finalTriggered) return;
+        if (state.jumpscareCooldown > 0) return;
+
+        state.jumpscareCooldown = 7.5;
+        state.jumpscareTimer = 0.75;
+        state.shake = Math.max(state.shake, 1.5);
+
+        if (hpDamage > 0) {
+          state.hp = Math.max(0, state.hp - hpDamage * DIFF.dmg);
+          const dmgVig = document.getElementById('damage-vignette');
+          dmgVig.style.opacity = '0.9';
+          later(() => { dmgVig.style.opacity = '0'; }, 400);
+        }
+
+        const flash = document.getElementById('scare-flash');
+        flash.style.opacity = '0.82';
+        audio.playCreatureScreech();
+        audio.playJumpscareStinger(false);
+        scarePropGroup.visible = true;
+        scareLight.intensity = 5; document.body.classList.add('scare-glitch'); audio.playScareBoom();
+        showToast(message || 'MAY BIGLANG SUMULPOT SA DILIM!');
+
+        later(() => {
+          flash.style.opacity = '0';
+          scarePropGroup.visible = false; scareLight.intensity = 0; document.body.classList.remove('scare-glitch');
+        }, 700);
+
+        if (state.hp <= 0 && !state.isGameOver) {
+          state.isGameOver = true;
+          try { document.exitPointerLock?.(); } catch (_) {}
+          document.getElementById('end-screen').classList.remove('hidden');
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         INTERCONNECTED ENVIRONMENT DESIGN:
+         1. Mountain Exit & Isolated Rural Settlement (z: 56 to 34)
+         2. Old Filipino Ancestral Wooden House with Locked Room (x: -10, z: 22)
+         3. Neglected Cemetery & Forgotten Chapel (x: 10, z: -4)
+         4. Ruined Underground Passage & Secret Ritual Chamber (x: 0, z: -38)
+         ---------------------------------------------------------------------- */
+      const colliders = [];
+      const hideZones = [];
+      const interactables = [];
+      const swayFoliage = [];
+
+      function addCollider(x, z, w, d) {
+        colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+      }
+
+      // Ground & Muddy Village Road
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(180, 180), new THREE.MeshStandardMaterial({ map: textures.forestFloor, roughness: 0.92 }));
+      ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+      scene.add(ground);
+
+      const roadMat = new THREE.MeshStandardMaterial({ map: textures.mud, roughness: 0.8 });
+      const roadNodes = [
+        [0, 54], [0, 44], [-3, 34], [-6, 24], [-2, 14], [4, 4], [8, -6], [4, -18], [0, -28], [0, -40]
+      ];
+      for (let i = 0; i < roadNodes.length - 1; i++) {
+        const [x1, z1] = roadNodes[i], [x2, z2] = roadNodes[i + 1];
+        const seg = new THREE.Mesh(new THREE.PlaneGeometry(3.5, Math.hypot(x2 - x1, z2 - z1) + 1.4), roadMat);
+        seg.rotation.x = -Math.PI / 2; seg.rotation.z = -Math.atan2(x2 - x1, z2 - z1);
+        seg.position.set((x1 + x2) / 2, 0.012, (z1 + z2) / 2);
+        scene.add(seg);
+      }
+
+      const barkMat = new THREE.MeshStandardMaterial({ map: textures.bark, roughness: 0.94 });
+      const canopyMat = new THREE.MeshStandardMaterial({ color: 0x0b1a12, roughness: 0.92 });
+      const woodMat = new THREE.MeshStandardMaterial({ map: textures.wood, roughness: 0.88 });
+      const nipaMat = new THREE.MeshStandardMaterial({ map: textures.nipa, roughness: 0.95 });
+      const bambooMat = new THREE.MeshStandardMaterial({ map: textures.bamboo, roughness: 0.86 });
+      const stoneMat = new THREE.MeshStandardMaterial({ map: textures.stone, roughness: 0.92 });
+
+      // Tropical Vegetation & Trees framing the settlement
+      const TREE_TRUNK = new THREE.CylinderGeometry(0.45, 0.78, 10, 8), TREE_CROWN = new THREE.DodecahedronGeometry(3.6, 1), FERN_BLADE = new THREE.ConeGeometry(0.42, 1.35, 4);
+      function addTree(x, z, s = 1.0) {
+        const g = new THREE.Group(); g.position.set(x, 0, z);
+        const tr = new THREE.Mesh(TREE_TRUNK, barkMat); tr.scale.setScalar(s); tr.position.y = 5 * s;
+        const cr = new THREE.Mesh(TREE_CROWN, canopyMat); cr.scale.setScalar(s); cr.position.y = 10.2 * s;
+        g.add(tr, cr); scene.add(g);
+        addCollider(x, z, 1.3 * s, 1.3 * s);
+      }
+      for (let i = 0; i < 85; i++) {
+        const a = (i / 85) * Math.PI * 2;
+        const r = 24 + (i % 5) * 7.5;
+        const tx = Math.cos(a) * r, tz = Math.sin(a) * r * 1.35 + 6;
+        if (Math.abs(tx) < 16 && tz > -46 && tz < 56) continue;
+        addTree(tx, tz, 0.85 + (i % 3) * 0.2);
+      }
+
+      // Tall Grass / Ferns (Cover / Hide Zones)
+      const fernMat = new THREE.MeshStandardMaterial({ color: 0x162b19, roughness: 0.85, side: THREE.DoubleSide });
+      for (let i = 0; i < 120; i++) {
+        const gx = Math.sin(i * 17.1) * 32, gz = Math.cos(i * 11.9) * 48 + 6;
+        if (roadNodes.some(([nx, nz]) => Math.hypot(gx - nx, gz - nz) < 2.5)) continue;
+        const bush = new THREE.Group(); bush.position.set(gx, 0, gz);
+        for (let b = 0; b < 4; b++) {
+          const blade = new THREE.Mesh(FERN_BLADE, fernMat);
+          blade.position.set(Math.cos(b * 1.5) * 0.22, 0.62, Math.sin(b * 1.5) * 0.22);
+          blade.rotation.set(0.25, b * 1.2, 0.15);
+          bush.add(blade);
+        }
+        scene.add(bush); swayFoliage.push({ mesh: bush, phase: i * 0.6 });
+        if (i % 3 === 0) hideZones.push({ x: gx, z: gz, radius: 1.8 });
+      }
+
+      /* ----------------------------------------------------------------------
+         AREA 1: ISOLATED RURAL SETTLEMENT & ABANDONED ANCESTRAL HOUSE
+         ---------------------------------------------------------------------- */
+      // Broken wooden welcome arch at settlement entrance (z = 42)
+      const archL = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 3.6, 8), bambooMat); archL.position.set(-2.4, 1.8, 42);
+      const archR = archL.clone(); archR.position.x = 2.4;
+      const archTop = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.45, 0.16), woodMat); archTop.position.set(0, 3.4, 42); archTop.rotation.z = 0.06;
+      scene.add(archL, archR, archTop);
+      addCollider(-2.4, 42, 0.5, 0.5); addCollider(2.4, 42, 0.5, 0.5);
+
+      interactables.push({
+        kind: 'note',
+        noteData: {
+          id: 'arch_sign',
+          title: 'Kupas na Karatula ng Sitio Matandang-Bato',
+          body: '"SITIO MATANDANG-BATO — Walang sinuman ang pinapayagang pumasok nang walang pahintulot ng Tagapagbantay ng Dugo."\n\n(Sa ilalim ng kahoy ay may nakaukit na inisyal: M.S. — Mateo)',
+          trans: 'Initials carved underneath: M.S. — Mateo.'
+        },
+        pos: new THREE.Vector3(-2.1, 1.5, 42), radius: 2.8, prompt: 'Suriin ang Karatula ng Sitio'
+      });
+
+      // Ancestral Wooden House (x = -10, z = 22) with Main Hall + Locked Ancestral Room
+      const houseX = -10.5, houseZ = 22;
+      const house = new THREE.Group(); house.position.set(houseX, 0, houseZ);
+      const hFloor = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.25, 8.6), woodMat); hFloor.position.y = 0.25;
+      const hRoof = new THREE.Mesh(new THREE.ConeGeometry(7.6, 3.2, 4), nipaMat); hRoof.position.y = 5.0; hRoof.rotation.y = Math.PI / 4;
+
+      // Exterior walls (entrance on east side x = +4.7)
+      const hWest = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.4, 8.6), woodMat); hWest.position.set(-4.7, 1.9, 0);
+      const hNorth = new THREE.Mesh(new THREE.BoxGeometry(9.6, 3.4, 0.24), woodMat); hNorth.position.set(0, 1.9, -4.2);
+      const hSouth = new THREE.Mesh(new THREE.BoxGeometry(9.6, 3.4, 0.24), woodMat); hSouth.position.set(0, 1.9, 4.2);
+      const hEastN = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.4, 3.0), woodMat); hEastN.position.set(4.7, 1.9, -2.7);
+      const hEastS = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.4, 3.0), woodMat); hEastS.position.set(4.7, 1.9, 2.7);
+
+      // Partition wall & Locked Ancestral Room Door (at z = -0.6 inside house)
+      const partWallL = new THREE.Mesh(new THREE.BoxGeometry(5.8, 3.4, 0.22), woodMat); partWallL.position.set(-1.7, 1.9, -0.6);
+      const partWallR = new THREE.Mesh(new THREE.BoxGeometry(1.6, 3.4, 0.22), woodMat); partWallR.position.set(3.8, 1.9, -0.6);
+      const ancestralDoor = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.8, 0.18), new THREE.MeshStandardMaterial({ color: 0x4a1d12, roughness: 0.85 }));
+      ancestralDoor.position.set(2.1, 1.6, -0.6);
+
+      // Old furniture & flickering oil lamp
+      const hTable = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.85, 1.1), woodMat); hTable.position.set(-2.2, 0.78, 1.8);
+      const hLamp = new THREE.PointLight(0xff8c2b, 3.2, 12, 1.5); hLamp.position.set(-2.2, 1.55, 1.8);
+      const secretTable = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.85, 1.0), woodMat); secretTable.position.set(-1.8, 0.78, -2.6);
+      const secretCandle = new THREE.PointLight(0xd94e28, 2.6, 9, 1.5); secretCandle.position.set(-1.8, 1.45, -2.6);
+
+      house.add(hFloor, hRoof, hWest, hNorth, hSouth, hEastN, hEastS, partWallL, partWallR, ancestralDoor, hTable, hLamp, secretTable, secretCandle);
+      scene.add(house);
+
+      // House Colliders
+      addCollider(houseX - 4.7, houseZ, 0.5, 8.6);
+      addCollider(houseX, houseZ - 4.2, 9.6, 0.5);
+      addCollider(houseX, houseZ + 4.2, 9.6, 0.5);
+      addCollider(houseX + 4.7, houseZ - 2.7, 0.5, 3.0);
+      addCollider(houseX + 4.7, houseZ + 2.7, 0.5, 3.0);
+      addCollider(houseX - 1.7, houseZ - 0.6, 5.8, 0.45);
+      addCollider(houseX + 3.8, houseZ - 0.6, 1.6, 0.45);
+      const ancestralDoorCollider = { minX: houseX + 1.2, maxX: houseX + 3.0, minZ: houseZ - 0.85, maxZ: houseZ - 0.35 };
+      colliders.push(ancestralDoorCollider);
+      hideZones.push({ x: houseX - 2.5, z: houseZ + 2.2, radius: 2.4 });
+
+      // Clue in Main Hall: Old Framed Contract giving the 3-digit lock code (4 - 1 - 8)
+      const frameMesh = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.06, 0.35), new THREE.MeshStandardMaterial({ color: 0xc9a66b }));
+      frameMesh.position.set(houseX - 2.2, 1.24, houseZ + 1.8); scene.add(frameMesh);
+      interactables.push({
+        kind: 'note',
+        noteData: {
+          id: 'house_ledger',
+          title: 'Lumang Kasunduan sa Mesa (1948)',
+          body: '"Ang susi sa Silid-Angkan ay ang bilang ng mga alay na nakatala sa aklat ng pamilya: Apat sa handaan, Isa sa gubat, Walo sa kapilya. (4 - 1 - 8)."',
+          trans: 'Ancestral Room Lock Code: 4 - 1 - 8.'
+        },
+        pos: frameMesh.position, radius: 2.6, prompt: 'Basahin ang Lumang Kasunduan (4-1-8)',
+        onRead: () => { if (state.act < 2) setAct(2); }
+      });
+
+      // Weapon in House: Banal na Krus (Holy Cross)
+      const krusMesh = createWeapon3DModel('krus');
+      krusMesh.position.set(houseX - 3.6, 1.1, houseZ + 3.2); scene.add(krusMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'krus', mesh: krusMesh, pos: krusMesh.position, radius: 2.5, prompt: 'Kunin ang Banal na Krus' });
+
+      // Locked Ancestral Room Door Interactable
+      const doorInteractable = {
+        kind: 'ancestral_door',
+        pos: new THREE.Vector3(houseX + 2.1, 1.5, houseZ - 0.2),
+        radius: 2.6,
+        prompt: 'Buksan ang Kandado ng Silid-Angkan (4-1-8)'
+      };
+      interactables.push(doorInteractable);
+
+      // Evidence #1 inside Locked Ancestral Room (Mateo's private ledger)
+      const ev1Mesh = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.08, 0.48), new THREE.MeshStandardMaterial({ color: 0x7a1c1c }));
+      ev1Mesh.position.set(houseX - 1.8, 1.25, houseZ - 2.6); scene.add(ev1Mesh);
+      interactables.push({
+        kind: 'evidence',
+        evId: 'ev1',
+        noteData: {
+          id: 'ev1_mateo_plan',
+          title: 'Lihim na Talaan ni Mateo (Ebidensya 1/4)',
+          body: '"Hindi alam ni Elias na ako mismo ang nagpadala ng imbitasyon sa kanya sa Handaan noong Chapter 1. Kailangang makaligtas siya sa gubat at sa Kapre upang marating niya ang nayong ito... eksakto sa oras ng kabilugan ng buwan."',
+          trans: 'Mateo secretly sent the invitation to Elias in Chapter 1 and guided him through the forest.'
+        },
+        pos: ev1Mesh.position, radius: 2.6, prompt: 'Siyasatin ang Lihim na Talaan sa Silid-Angkan'
+      });
+
+      /* ----------------------------------------------------------------------
+         AREA 2: NEGLECTED CEMETERY & FORGOTTEN CHAPEL (x: +10, z: -6)
+         ---------------------------------------------------------------------- */
+      // Cemetery Graves (z: 6 to -2, x: 4 to 14)
+      for (let g = 0; g < 10; g++) {
+        const gx = 5.5 + (g % 3) * 3.2;
+        const gz = 5 - Math.floor(g / 3) * 2.8;
+        const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.25, 0.14), stoneMat); crossV.position.set(gx, 0.62, gz);
+        const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.16, 0.14), stoneMat); crossH.position.set(gx, 0.92, gz);
+        crossV.rotation.z = (g % 2 === 0 ? 0.08 : -0.09);
+        scene.add(crossV, crossH);
+        addCollider(gx, gz, 0.6, 0.5);
+      }
+
+      // Evidence #2 on an empty open grave with Mateo's name carved on the stone
+      interactables.push({
+        kind: 'evidence',
+        evId: 'ev2',
+        noteData: {
+          id: 'ev2_tombstone',
+          title: 'Basag na Lapida sa Sementeryo (Ebidensya 2/4)',
+          body: '"Nakaukit dito: MATEO SALAZAR — Isinilang 1924. Namatay: HINDI KAILANMAN.\n\n(Biglang sumakit ang ulo ni Elias—naalala niya ang gabi sa gubat nang iligtas kuno siya ni Mateo... ngunit wala namang anino si Mateo sa liwanag ng sulo!)"',
+          trans: 'Mateo Salazar — Born 1924. Died: NEVER. Elias remembers Mateo cast no shadow.'
+        },
+        pos: new THREE.Vector3(8.7, 1.0, 2.2), radius: 2.6, prompt: 'Suriin ang Lapida na may Pangalan ni Mateo'
+      });
+
+      // Weapon in Cemetery: Banal na Asin (Holy Salt)
+      const asinMesh = createWeapon3DModel('asin');
+      asinMesh.position.set(11.8, 0.45, -1.2); scene.add(asinMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'asin', mesh: asinMesh, pos: asinMesh.position, radius: 2.5, prompt: 'Kunin ang Mangkok ng Banal na Asin' });
+
+      // Forgotten Chapel (x = 11, z = -12)
+      const chapX = 11.0, chapZ = -12.0;
+      const chapel = new THREE.Group(); chapel.position.set(chapX, 0, chapZ);
+      const cFloor = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.25, 8.4), stoneMat); cFloor.position.y = 0.25;
+      const cBack = new THREE.Mesh(new THREE.BoxGeometry(7.2, 4.0, 0.3), stoneMat); cBack.position.set(0, 2.0, -4.1);
+      const cLeft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.0, 8.4), stoneMat); cLeft.position.set(-3.5, 2.0, 0);
+      const cRight = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.0, 8.4), stoneMat); cRight.position.set(3.5, 2.0, 0);
+      const cRoof = new THREE.Mesh(new THREE.ConeGeometry(6.0, 2.8, 4), nipaMat); cRoof.position.y = 5.3; cRoof.rotation.y = Math.PI / 4;
+      const altarBase = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.15, 1.1), stoneMat); altarBase.position.set(0, 0.8, -2.8);
+      const altarLight = new THREE.PointLight(0xff7b29, 3.4, 12, 1.5); altarLight.position.set(0, 1.85, -2.5);
+      chapel.add(cFloor, cBack, cLeft, cRight, cRoof, altarBase, altarLight);
+      scene.add(chapel);
+
+      addCollider(chapX, chapZ - 4.1, 7.2, 0.5);
+      addCollider(chapX - 3.5, chapZ, 0.5, 8.4);
+      addCollider(chapX + 3.5, chapZ, 0.5, 8.4);
+      hideZones.push({ x: chapX - 2.2, z: chapZ + 2.0, radius: 2.3 });
+
+      // Weapon in Chapel: Punyal (Ritual Dagger)
+      const punyalMesh = createWeapon3DModel('punyal');
+      punyalMesh.position.set(chapX + 2.2, 0.65, chapZ - 2.8); scene.add(punyalMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'punyal', mesh: punyalMesh, pos: punyalMesh.position, radius: 2.5, prompt: 'Kunin ang Lumang Punyal sa Kapilya' });
+
+      // Photo Chronology Altar Puzzle in Chapel
+      interactables.push({
+        kind: 'photo_altar',
+        pos: new THREE.Vector3(chapX, 1.4, chapZ - 2.3),
+        radius: 2.8,
+        prompt: 'Suriin ang Altar ng mga Lumang Larawan'
+      });
+
+      /* ----------------------------------------------------------------------
+         AREA 3: RUINED UNDERGROUND PASSAGE & SECRET RITUAL CHAMBER (x: 0, z: -38)
+         ---------------------------------------------------------------------- */
+      // Stone Gate blocking Underground Passage until Chapel Photo Altar is solved (z = -24)
+      const underGate = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.6, 0.6), stoneMat);
+      underGate.position.set(0, 1.8, -24);
+      const gateRune = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.07, 8, 24), new THREE.MeshBasicMaterial({ color: 0xc92a1d }));
+      gateRune.position.set(0, 1.8, -23.65);
+      scene.add(underGate, gateRune);
+      const underGateCollider = { minX: -2.4, maxX: 2.4, minZ: -24.5, maxZ: -23.5 };
+      colliders.push(underGateCollider);
+
+      // Underground Stone Corridor & Secret Ritual Chamber (z: -25 to -52)
+      const chamberFloor = new THREE.Mesh(new THREE.BoxGeometry(16, 0.3, 28), stoneMat); chamberFloor.position.set(0, 0.05, -38);
+      const chamberCeil = new THREE.Mesh(new THREE.BoxGeometry(16, 0.4, 28), stoneMat); chamberCeil.position.set(0, 4.4, -38);
+      const chamberLeft = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.5, 28), stoneMat); chamberLeft.position.set(-7.8, 2.2, -38);
+      const chamberRight = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.5, 28), stoneMat); chamberRight.position.set(7.8, 2.2, -38);
+      const chamberBack = new THREE.Mesh(new THREE.BoxGeometry(16, 4.5, 0.5), stoneMat); chamberBack.position.set(0, 2.2, -51.8);
+      scene.add(chamberFloor, chamberCeil, chamberLeft, chamberRight, chamberBack);
+
+      addCollider(-7.8, -38, 0.7, 28);
+      addCollider(7.8, -38, 0.7, 28);
+      addCollider(0, -51.8, 16, 0.7);
+      [-5.1, 5.1].forEach(x => { const w = new THREE.Mesh(new THREE.BoxGeometry(5.8, 4.5, 0.6), stoneMat); w.position.set(x, 2.2, -24); scene.add(w); addCollider(x, -24, 5.8, 1.0); });
+
+      // Ritual Blood Circle & Central Pedestal at (0, 0, -45)
+      const ritualCircle = new THREE.Mesh(
+        new THREE.RingGeometry(2.4, 2.75, 32),
+        new THREE.MeshBasicMaterial({ color: 0x9e1818, side: THREE.DoubleSide })
+      );
+      ritualCircle.rotation.x = -Math.PI / 2;
+      ritualCircle.position.set(0, 0.22, -45);
+
+      const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.85, 1.15, 12), stoneMat);
+      pedestal.position.set(0, 0.75, -45);
+
+      const finalRelic = new THREE.Mesh(
+        new THREE.BoxGeometry(0.46, 0.07, 0.36),
+        new THREE.MeshStandardMaterial({ color: 0xd4af37, emissive: 0x6b1414, roughness: 0.4 })
+      );
+      finalRelic.position.set(0, 1.38, -45);
+
+      const chamberLight = new THREE.PointLight(0xd9381e, 3.6, 16, 1.5);
+      chamberLight.position.set(0, 2.6, -45);
+      scene.add(ritualCircle, pedestal, finalRelic, chamberLight);
+
+      // Evidence #3 on side pillar in Ritual Chamber
+      interactables.push({
+        kind: 'evidence',
+        evId: 'ev3',
+        noteData: {
+          id: 'ev3_ritual_scroll',
+          title: 'Pergamino ng Kasúma (Ebidensya 3/4)',
+          body: '"Hindi biktima ang sinumang nagdadala ng bisita sa handaan. Ang tagapag-akay ang siyang nagpapanggap na kaibigan—hinihintay niyang mapuno ng takot ang dugo ng biktima bago ihain sa Panginoon ng Dilim."',
+          trans: 'The guide pretends to be a friend, letting fear ripen the victim’s blood before the ritual.'
+        },
+        pos: new THREE.Vector3(-4.5, 1.4, -42), radius: 2.8, prompt: 'Basahin ang Pergamino sa Haligi'
+      });
+
+      // Agimat on right ritual pillar
+      const agimatMesh = createWeapon3DModel('agimat');
+      agimatMesh.position.set(4.5, 1.25, -42); scene.add(agimatMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'agimat', mesh: agimatMesh, pos: agimatMesh.position, radius: 2.6, prompt: 'Kunin ang Sinaunang Agimat' });
+
+      // FINAL CLUE (Evidence #4) -> Triggers the Mandatory Part 1 Ending Sequence!
+      interactables.push({
+        kind: 'final_revelation',
+        pos: new THREE.Vector3(0, 1.4, -45),
+        radius: 2.8,
+        prompt: 'Suriin ang Lihim na Larawan at Selyo sa Dambana'
+      });
+
+      /* ----------------------------------------------------------------------
+         MATEO APPARITIONS & NEW FILIPINO FOLKLORE THREATS (NO KAPRE / MALIGNO)
+         ---------------------------------------------------------------------- */
+      const mateoH = createMateoPhoto();   // Mateo na may larawan ng mukha (Chapter 1)
+      const aswangA = createAswang();      // Aswang ng Chapter 1
+      const mateoEntity = { root: new THREE.Group() };
+      mateoEntity.root.add(mateoH.group, aswangA.group);
+      aswangA.group.position.set(0, 0, 0); aswangA.group.rotation.set(0, 0, 0); aswangA.group.visible = false;
+      mateoH.group.position.set(0, 0, 0); mateoH.group.rotation.set(0, 0, 0);
+      scene.add(mateoEntity.root);
+      scarePropGroup.visible = true; mateoEntity.root.visible = true; aswangA.group.visible = true;
+      renderer.compile(scene, camera);   // iwas hitch sa unang jumpscare
+      scarePropGroup.visible = false; mateoEntity.root.visible = false; aswangA.group.visible = false;
+
+      function scriptedScare(msg) {
+        if (state.isGameOver || state.finalTriggered) return;
+        if (state.isNoteOpen || state.isPaused || state.isCinematic) { later(() => scriptedScare(msg), 1200); return; }
+        state.jumpscareCooldown = 0; triggerJumpscare('soul', 0, msg);
+      }
+      function flickerDark(sec) { state.flickerT = sec; audio.playWoodCreak(0); }
+      const scareTriggers = [
+        { done: false, test: () => Math.abs(state.pos.x - houseX) < 4.2 && Math.abs(state.pos.z - houseZ) < 3.8, run: () => { flickerDark(1.1); later(() => scriptedScare('May humihinga sa likod mo sa loob ng bahay!'), 1300); } },
+        { done: false, test: () => state.ancestralRoomUnlocked, run: () => later(() => scriptedScare('May nakatingin sa loob ng Silid-Angkan!'), 900) },
+        { done: false, test: () => state.chapelAltarSolved, run: () => { flickerDark(0.9); later(() => scriptedScare('Gumuhit ang mukha sa dilim ng altar!'), 1100); } },
+        { done: false, test: () => state.pos.z < -29 && state.chapelAltarSolved, run: () => { flickerDark(1.4); audio.playSupernaturalDrone(3.5); later(() => scriptedScare('Nasa likod mo ang Aswang... huwag kang lumingon!'), 1700); } }
+      ];
+
+      // Brief unsettling Mateo sightings before the final reveal
+      const mateoSightings = [
+        { zTrigger: 35, x: -7.5, z: 26, done: false, line: 'May nakatayo sa bintana ng lumang bahay... nakangiti nang hindi gumagalaw.' },
+        { zTrigger: 5,  x: 10.5, z: -6, done: false, scare: true, line: 'Anino ni Mateo sa sementeryo... bakit hindi siya kumukurap?' }
+      ];
+
+      // New Folklore Entities:
+      // 1. Wakwak / Manananggal-shadow (swooping/stalking roof & village predator)
+      // 2. Ligaw na Kaluluwa / Tiyanak-wraith (cemetery & chapel weeping spirit)
+      // 3. Sigbin (low-crouching fast shadow beast in underground passage)
+      const threats = [];
+      function spawnThreat(kind, x, z) {
+        const g = new THREE.Group(); g.position.set(x, 0, z);
+        if (kind === 'wakwak') {
+          const body = new THREE.Mesh(new THREE.ConeGeometry(0.36, 1.5, 8), new THREE.MeshStandardMaterial({ color: 0x140b0c, roughness: 0.9 }));
+          body.position.y = 1.4;
+          const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.05, 0.55), new THREE.MeshStandardMaterial({ color: 0x0c0607 }));
+          wingL.position.set(-0.75, 1.75, 0);
+          const wingR = wingL.clone(); wingR.position.x = 0.75;
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05), new THREE.MeshBasicMaterial({ color: 0xff2a1a }));
+          eye.position.set(0, 1.95, 0.25);
+          g.add(body, wingL, wingR, eye);
+          g.userData = { wingL, wingR };
+        } else if (kind === 'kaluluwa') {
+          const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.42, 1.35, 8), new THREE.MeshStandardMaterial({ color: 0x262d36, transparent: true, opacity: 0.82 }));
+          robe.position.y = 0.72;
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10), new THREE.MeshStandardMaterial({ color: 0x6c7682 }));
+          head.position.y = 1.52;
+          g.add(robe, head);
+        } else {
+          // Sigbin (low-crouching reverse-legged dark creature)
+          const torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.42, 0.85), new THREE.MeshStandardMaterial({ color: 0x120e0d, roughness: 0.95 }));
+          torso.position.y = 0.52;
+          const eyes = new THREE.Mesh(new THREE.SphereGeometry(0.045), new THREE.MeshBasicMaterial({ color: 0xffaa1a }));
+          eyes.position.set(0, 0.65, 0.44);
+          g.add(torso, eyes);
+        }
+        scene.add(g);
+        threats.push({
+          kind, group: g, home: new THREE.Vector3(x, 0, z),
+          hp: kind === 'sigbin' ? 85 : 65, stun: 0, cooldown: 3.0, phase: Math.random() * 6.28
+        });
+      }
+
+      spawnThreat('wakwak', -6.5, 16);
+      spawnThreat('kaluluwa', 8.5, -2);
+      spawnThreat('kaluluwa', 11.0, -10);
+      spawnThreat('sigbin', -3.5, -34);
+
+      /* ----------------------------------------------------------------------
+         WEAPONS, PUZZLES & INTERACTIONS
+         ---------------------------------------------------------------------- */
+      function addEvidence(evId) {
+        if (!state[evId]) {
+          state[evId] = true;
+          state.evidenceCount = Math.min(4, state.evidenceCount + 1);
+          document.getElementById('clue-counter').textContent = `EBIDENSYA NI MATEO: ${state.evidenceCount} / 4`;
+          triggerMemoryFlash(1.8);
+        }
+      }
+
+      function updateWeaponHUD() {
+        ['sulo', 'krus', 'punyal', 'agimat', 'asin'].forEach((key, idx) => {
+          const el = document.getElementById(`slot-${idx + 1}`);
+          el.classList.toggle('has-item', !!state.ownedWeapons[key]);
+          el.classList.toggle('active', state.equippedWeapon === key);
+        });
+        document.getElementById('equipped-name').textContent = state.equippedWeapon ? state.equippedWeapon.toUpperCase() : 'WALANG HAWAK';
+      }
+
+      function equipWeapon(type) {
+        if (type && !state.ownedWeapons[type]) return;
+        state.equippedWeapon = type;
+        Object.entries(rig.fpWeapons).forEach(([k, m]) => { m.visible = (k === type); });
+        rig.suloHandLight.intensity = type === 'sulo' ? 4.2 : 0;
+        updateWeaponHUD();
+      }
+      equipWeapon(state.equippedWeapon);
+
+      function performAction() {
+        if (!state.isPlaying || state.isPaused || state.isCinematic || state.isNoteOpen || state.isGameOver || state.finalTriggered || state.attackCooldown > 0) return;
+        const w = state.equippedWeapon;
+        if (!w) { showToast('Wala kang hawak na gamit [1-5].'); return; }
+        state.attackCooldown = 0.5; state.swingAnim = 1.0;
+        audio.playWeaponSwing(w);
+
+        if (w === 'asin') {
+          state.saltWardTimer = 15.0;
+          showToast('Nagsaboy ka ng Banal na Asin! Hindi makakalapit ang mga masasamang espiritu.');
+          threats.forEach(t => { t.stun = 5.5; });
+          return;
+        }
+
+        const fwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw);
+        const DMG = { sulo: 24, krus: 45, punyal: 58, agimat: 42 };
+        const dmg = DMG[w] || 22;
+        threats.forEach(t => {
+          if (t.dead) return;
+          const toT = new THREE.Vector3().subVectors(t.group.position, state.pos); toT.y = 0;
+          if (toT.length() < 3.8 && fwd.dot(toT.normalize()) > 0.4) {
+            t.hp -= dmg;
+            t.stun = 3.5;
+            audio.playCreatureScreech();
+            if (t.hp <= 0) {
+              t.dead = true;
+              scene.remove(t.group);
+              showToast('Naitaboy nang tuluyan ang nilalang sa dilim!');
+            } else {
+              showToast('Tinamaan ang nilalang!');
+            }
+          }
+        });
+      }
+
+      // Ancestral Room Combination Lock (Code: 4 - 1 - 8)
+      const codeDigits = [0, 0, 0];
+      function openAncestralLockModal() {
+        state.isNoteOpen = true;
+        try { document.exitPointerLock?.(); } catch (_) {}
+        document.getElementById('code-msg').textContent = '';
+        codeDigits.forEach((v, i) => { document.getElementById('dig-' + i).textContent = v; });
+        document.getElementById('code-modal').classList.add('open');
+      }
+
+      document.querySelectorAll('.wheel [data-w]').forEach(btn => {
+        btn.onclick = () => {
+          const w = +btn.dataset.w, d = +btn.dataset.d;
+          codeDigits[w] = (codeDigits[w] + d + 10) % 10;
+          document.getElementById('dig-' + w).textContent = codeDigits[w];
+          audio.playFlashlightClick();
+        };
+      });
+
+      document.getElementById('code-try').onclick = () => {
+        if (codeDigits[0] === 4 && codeDigits[1] === 1 && codeDigits[2] === 8) {
+          state.ancestralRoomUnlocked = true;
+          state.isNoteOpen = false;
+          document.getElementById('code-modal').classList.remove('open');
+          ancestralDoor.rotation.y = Math.PI / 2;
+          ancestralDoor.position.set(1.3, 1.6, -1.4);
+          const idx = colliders.indexOf(ancestralDoorCollider);
+          if (idx > -1) colliders.splice(idx, 1);
+          interactables.splice(interactables.indexOf(doorInteractable), 1);
+          showToast('Bumukas ang Silid-Angkan!');
+          setAct(2);
+        } else {
+          document.getElementById('code-msg').textContent = 'Maling kumbinasyon. Suriin ang lumang kasunduan sa mesa.';
+          audio.playWoodCreak(0);
+        }
+      };
+      document.getElementById('code-close').onclick = () => { state.isNoteOpen = false; document.getElementById('code-modal').classList.remove('open'); };
+
+      // Historical Photo Altar Puzzle (Order: 1948 [1] -> 1974 [2] -> 1998 [3])
+      let photoSeq = [];
+      function openPhotoAltarModal() {
+        state.isNoteOpen = true;
+        photoSeq = [];
+        document.getElementById('photo-status').textContent = 'Napili: Wala pa';
+        try { document.exitPointerLock?.(); } catch (_) {}
+        document.getElementById('photo-modal').classList.add('open');
+      }
+
+      document.querySelectorAll('.p-card').forEach(card => {
+        card.onclick = () => {
+          const ord = +card.dataset.order;
+          const yr = card.querySelector('.p-yr').textContent;
+          if (photoSeq.includes(ord)) return;
+          photoSeq.push(ord);
+          audio.playFlashlightClick();
+          document.getElementById('photo-status').textContent = 'Napili: ' + photoSeq.map(o => o === 1 ? '1948' : o === 2 ? '1974' : '1998').join(' → ');
+          if (photoSeq.length === 3) {
+            if (photoSeq[0] === 1 && photoSeq[1] === 2 && photoSeq[2] === 3) {
+              state.chapelAltarSolved = true;
+              state.isNoteOpen = false;
+              document.getElementById('photo-modal').classList.remove('open');
+              underGate.position.y = -2.4;
+              gateRune.material.color.setHex(0x63e696);
+              const idx = colliders.indexOf(underGateCollider);
+              if (idx > -1) colliders.splice(idx, 1);
+              showToast('Bumukas ang batong lagusan patungo sa Silid-Ritwal sa ilalim ng lupa!');
+              triggerMemoryFlash(2.0);
+              setAct(4);
+            } else {
+              photoSeq = [];
+              document.getElementById('photo-status').textContent = 'Mali ang pagkakasunod-sunod! Subukan muli (1948 → 1974 → 1998).';
+              audio.playWhisperSpatial(0, 0.85);
+            }
+          }
+        };
+      });
+      document.getElementById('photo-reset').onclick = () => { photoSeq = []; document.getElementById('photo-status').textContent = 'Napili: Wala pa'; };
+      document.getElementById('photo-close').onclick = () => { state.isNoteOpen = false; document.getElementById('photo-modal').classList.remove('open'); };
+
+      /* ----------------------------------------------------------------------
+         MANDATORY FINAL CINEMATIC SEQUENCE — PART 1 FINALE
+         1. Elias examines final clue -> realization & betrayal dialogue
+         2. Ambience fades, lights flicker, sudden silence
+         3. Whisper behind Elias: MATEO: "Elias..."
+         4. Slow unnatural camera rotation toward Mateo in the dark
+         5. Progressive Aswang transformation (face, eyes, claws, posture)
+         6. Sudden high-impact Aswang lunge jumpscare -> Blackout
+         7. Title & Part 1 End Card + Part 2 Teaser ("Akala mo ba... ako lang?")
+         ---------------------------------------------------------------------- */
+      function triggerFinalEndingSequence() {
+        if (state.finalTriggered) return;
+        state.finalTriggered = true;
+        state.isCinematic = true;
+        state.isNoteOpen = false;
+        addEvidence('ev4');
+        try { document.exitPointerLock?.(); } catch (_) {}
+        document.body.classList.add('cinematic');
+
+        // Hide regular threats during finale
+        threats.forEach(t => { t.group.visible = false; });
+
+        // Lock Elias in front of the ritual altar looking North (-Z)
+        state.pos.set(0, 1.72, -43.4);
+        state.yaw = 0;
+        state.pitch = -0.18;
+        camera.position.copy(state.pos);
+        camera.rotation.set(state.pitch, state.yaw, 0);
+
+        // Place Mateo directly behind Elias (+Z = -39.6) in the darkness
+        mateoH.group.visible = true; aswangA.group.visible = false; mateoH.group.scale.set(1, 1, 1);
+        scarePropGroup.visible = false; scareLight.intensity = 0;
+        mateoEntity.root.visible = true;
+        mateoEntity.root.position.set(0, 0, -39.4);
+        mateoEntity.root.lookAt(0, 0, -43.4);
+
+        // Phase 1 (0s - 9.5s): Examining the final clue & realization
+        showSubtitle('ELIAS', '(Hawak ang lumang larawan at selyo ng ritwal... Nakatayo si Mateo sa tabi ng mga kulto noong 1948, 1974, at sa Handaan...)', 'Elias examines the ritual photograph showing Mateo orchestrating everything.', 3200);
+
+        later(() => {
+          showSubtitle('ELIAS', '"Mateo...?"', '"Mateo...?"', 2200);
+        }, 3400);
+
+        later(() => {
+          showSubtitle('ELIAS', '"Hindi maaari..."', '"This can\'t be..."', 2200);
+          audio.fadeOutAmbience(2.2);
+        }, 5800);
+
+        later(() => {
+          showSubtitle('ELIAS', '"Ikaw ang may gawa ng lahat ng ito?"', '"You were behind all of this?"', 2600);
+          // Lights begin to flicker & die out
+          chamberLight.intensity = 0.6;
+          flashlight.intensity = 1.4;
+        }, 8200);
+
+        // Phase 2 (11.2s): Unnatural silence -> Whisper behind Elias -> Slow Head-Turn Reveal
+        later(() => {
+          chamberLight.intensity = 0.05;
+          flashlight.intensity = 0.35;
+          scene.fog.density = 0.068;
+          audio.playSupernaturalDrone(6.5);
+          showSubtitle('MATEO', '"Elias..."', '"Elias..."', 2600);
+
+          // Begin slow, unnatural 180-degree camera turn toward Mateo (yaw: 0 -> Math.PI)
+          state.finalePhase = 1;
+          state.finaleTimer = 0;
+        }, 11200);
+
+        // Phase 3 (15.0s): Camera faces Mateo -> Progressive Aswang Transformation
+        later(() => {
+          state.finalePhase = 2;
+          state.finaleTimer = 0;
+          revealLight.position.set(0, 2.0, -40.5);
+          revealLight.intensity = 2.6;
+          audio.playAswangMorph();
+          showSubtitle('MATEO (ASWANG)', '"Akala mo ba... inililigtas kita?"', '"Did you really think... I was saving you?"', 3000);
+        }, 15000);
+        later(() => showSubtitle('MATEO (ASWANG)', '"Ikaw ang huling alay, Elias."', '"You are the final offering, Elias."', 2200), 17400);
+
+        // Phase 4 (18.4s): Sudden High-Impact Aswang Lunge Jumpscare
+        later(() => {
+          state.finalePhase = 3;
+          state.finaleTimer = 0;
+          revealLight.intensity = 6.5;
+          audio.playJumpscareStinger(true); audio.playScareBoom();
+          audio.playCreatureScreech();
+          document.getElementById('scare-flash').style.opacity = '0.95';
+          [120, 240, 360, 480, 600].forEach((ms, i) => later(() => { document.getElementById('scare-flash').style.opacity = i % 2 ? '0.9' : '0'; }, ms));
+        }, 19600);
+
+        // Phase 5 (19.05s): Hard Cut to Blackout & Stop Audio
+        later(() => {
+          document.getElementById('blackout-screen').style.opacity = '1';
+          audio.stopAllAudio();
+        }, 20450);
+
+        // Phase 6 (20.4s): Display Part 1 Finale Cards & Part 2 Teaser
+        later(() => {
+          state.isPlaying = false;
+          const fin = document.getElementById('finale-screen');
+          fin.classList.add('open');
+
+          later(() => { document.getElementById('finale-kicker').style.opacity = '1'; }, 400);
+          later(() => { document.getElementById('finale-title').style.opacity = '1'; }, 1100);
+          later(() => { document.getElementById('finale-part').style.opacity = '1'; }, 2000);
+          later(() => { document.getElementById('finale-quote').style.opacity = '1'; }, 3200);
+
+          // Part 2 Teaser after short silence
+          later(() => {
+            document.getElementById('finale-teaser').style.opacity = '1';
+          }, 5600);
+
+          // Cut to black on teaser, then reveal replay option
+          later(() => {
+            document.getElementById('finale-teaser').style.opacity = '0';
+            document.getElementById('finale-quote').style.opacity = '0';
+            document.getElementById('finale-part').style.opacity = '0';
+            document.getElementById('finale-title').style.opacity = '0';
+            document.getElementById('finale-kicker').style.opacity = '0';
+          }, 8400);
+
+          later(() => {
+            document.getElementById('finale-kicker').style.opacity = '1';
+            document.getElementById('finale-title').style.opacity = '1';
+            document.getElementById('finale-part').style.opacity = '1';
+            document.getElementById('finale-actions').style.opacity = '1';
+          }, 9600);
+        }, 21800);
+      }
+
+      const collectedDocs = [];
+      let currentHovered = null;
+
+      function handleInteract() {
+        if (state.finalTriggered) return;
+        if (state.isNoteOpen) {
+          state.isNoteOpen = false;
+          document.getElementById('note-modal').classList.remove('open');
+          document.getElementById('journal-modal').classList.remove('open');
+          return;
+        }
+        if (!currentHovered || state.isCinematic || state.isPaused) return;
+        const it = currentHovered;
+        if (it.kind === 'weapon') {
+          state.ownedWeapons[it.weaponType] = true;
+          scene.remove(it.mesh);
+          interactables.splice(interactables.indexOf(it), 1);
+          equipWeapon(it.weaponType);
+          showToast(`Nakuha: ${it.weaponType.toUpperCase()}`);
+        } else if (it.kind === 'note' || it.kind === 'evidence') {
+          state.isNoteOpen = true;
+          try { document.exitPointerLock?.(); } catch (_) {}
+          document.getElementById('note-title').textContent = it.noteData.title;
+          document.getElementById('note-body').textContent = it.noteData.body;
+          document.getElementById('note-trans').textContent = it.noteData.trans;
+          document.getElementById('note-modal').classList.add('open');
+          if (!collectedDocs.some(d => d.id === it.noteData.id)) collectedDocs.push(it.noteData);
+          if (it.kind === 'evidence') {
+            addEvidence(it.evId);
+            if (it.evId === 'ev1' && state.act < 3) setAct(3);
+          }
+          if (it.onRead) it.onRead();
+        } else if (it.kind === 'ancestral_door') {
+          openAncestralLockModal();
+        } else if (it.kind === 'photo_altar') {
+          openPhotoAltarModal();
+        } else if (it.kind === 'final_revelation') {
+          triggerFinalEndingSequence();
+        }
+      }
+
+      const keys = {}; let isDraggingLook = false, prevX = 0, prevY = 0; const joyInput = { x: 0, y: 0 };
+      function closeAllModals() {
+        state.isNoteOpen = false;
+        ['note-modal', 'code-modal', 'photo-modal', 'journal-modal'].forEach(id => document.getElementById(id).classList.remove('open'));
+      }
+      function openJournal() {
+        if (!state.isPlaying || state.isPaused || state.isNoteOpen || state.isCinematic || state.finalTriggered) return;
+        state.isNoteOpen = true;
+        try { document.exitPointerLock?.(); } catch (_) {}
+        document.getElementById('journal-list').innerHTML = collectedDocs.length
+          ? collectedDocs.map(d => `<div class="j-item"><b>${d.title}</b><div style="white-space:pre-line">${d.body}</div></div>`).join('')
+          : '<div class="j-empty">Wala pang naitatalang ebidensya sa talaarawan.</div>';
+        document.getElementById('journal-modal').classList.add('open');
+      }
+      function dropWeapon() {
+        const w = state.equippedWeapon;
+        if (!w || state.isCinematic || state.isNoteOpen || state.isPaused || state.finalTriggered) return;
+        const f = new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+        const mesh = createWeapon3DModel(w);
+        mesh.position.set(state.pos.x + f.x * 1.3, 0.75, state.pos.z + f.z * 1.3); scene.add(mesh);
+        interactables.push({ kind: 'weapon', weaponType: w, mesh, pos: mesh.position, radius: 2.4, prompt: 'Pulutin ang ' + w.toUpperCase() });
+        state.ownedWeapons[w] = false; equipWeapon(null); audio.playWeaponDrop();
+      }
+      let lockWas = false;
+      function onLockChange() {
+        const locked = document.pointerLockElement === canvas;
+        if (lockWas && !locked && state.isPlaying && !state.isPaused && !state.isNoteOpen && !state.isGameOver && !state.finalTriggered) togglePause();
+        lockWas = locked;
+      }
+      function onBlur() { Object.keys(keys).forEach(k => { keys[k] = false; }); isDraggingLook = false; }
+      document.addEventListener('pointerlockchange', onLockChange); window.addEventListener('blur', onBlur);
+
+      function onKeyDown(e) {
+        keys[e.code] = true;
+        if (state.finalTriggered) return;
+        if (e.code === 'Escape') {
+          if (state.isNoteOpen) {
+            state.isNoteOpen = false;
+            document.getElementById('note-modal').classList.remove('open');
+            document.getElementById('code-modal').classList.remove('open');
+            document.getElementById('photo-modal').classList.remove('open');
+            document.getElementById('journal-modal').classList.remove('open');
+          } else if (state.isPlaying && !state.isGameOver) togglePause();
+        }
+        if (state.isPlaying && !state.isPaused && state.isNoteOpen && (e.code === 'KeyE' || e.code === 'KeyJ')) { closeAllModals(); return; }
+        if (!state.isPlaying || state.isPaused || state.isNoteOpen) return;
+        if (e.code === 'KeyE') handleInteract();
+        if (e.code === 'KeyJ') openJournal();
+        if (e.code === 'KeyG') dropWeapon();
+        if (e.code === 'KeyF' && state.battery > 1) { state.flashlightOn = !state.flashlightOn; audio.playFlashlightClick(); }
+        if (e.code === 'KeyC' || e.code === 'ControlLeft') state.isCrouching = !state.isCrouching;
+        if (e.code === 'Digit1') equipWeapon('sulo');
+        if (e.code === 'Digit2') equipWeapon('krus');
+        if (e.code === 'Digit3') equipWeapon('punyal');
+        if (e.code === 'Digit4') equipWeapon('agimat');
+        if (e.code === 'Digit5') equipWeapon('asin');
+      }
+      function onKeyUp(e) { keys[e.code] = false; }
+      function onMouseDown(e) {
+        if (!state.isPlaying || state.isPaused || state.isNoteOpen || state.finalTriggered) return;
+        audio.init(); isDraggingLook = true; prevX = e.clientX; prevY = e.clientY;
+        try { canvas.requestPointerLock?.(); } catch (_) {}
+        if (e.button === 0) performAction();
+      }
+      function onMouseMove(e) {
+        if (!state.isPlaying || state.isCinematic || state.isPaused || state.isNoteOpen || state.finalTriggered) return;
+        if (document.pointerLockElement === canvas) {
+          state.yaw -= e.movementX * 0.0024;
+          state.pitch = THREE.MathUtils.clamp(state.pitch - e.movementY * 0.0024, -1.25, 1.25);
+        } else if (isDraggingLook) {
+          state.yaw -= (e.clientX - prevX) * 0.0045;
+          state.pitch = THREE.MathUtils.clamp(state.pitch - (e.clientY - prevY) * 0.0045, -1.25, 1.25);
+          prevX = e.clientX; prevY = e.clientY;
+        }
+      }
+      function onMouseUp() { isDraggingLook = false; }
+      function togglePause() {
+        if (state.finalTriggered) return;
+        state.isPaused = !state.isPaused;
+        if (state.isPaused) { try { document.exitPointerLock?.(); } catch (_) {} }
+        document.getElementById('pause-screen').classList.toggle('hidden', !state.isPaused);
+        document.body.classList.toggle('menu-open', state.isPaused);
+      }
+
+      window.addEventListener('keydown', onKeyDown); window.addEventListener('keyup', onKeyUp);
+      canvas.addEventListener('mousedown', onMouseDown); document.addEventListener('mousemove', onMouseMove); window.addEventListener('mouseup', onMouseUp);
+      document.getElementById('pause-btn-hud').onclick = togglePause; document.getElementById('resume-btn').onclick = togglePause;
+      document.getElementById('close-note-btn').onclick = () => { state.isNoteOpen = false; document.getElementById('note-modal').classList.remove('open'); };
+      document.getElementById('journal-close').onclick = () => { state.isNoteOpen = false; document.getElementById('journal-modal').classList.remove('open'); };
+      document.getElementById('save-checkpoint-btn').onclick = () => saveProgress({ difficulty: diffId, hp: state.hp, battery: state.battery, ownedWeapons: state.ownedWeapons, equippedWeapon: state.equippedWeapon });
+
+      // Mobile touch controls wiring
+      const joyZone = document.getElementById('joy-zone');
+      const joyStick = document.getElementById('joy-stick');
+      if (joyZone) {
+        joyZone.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          const t = e.touches[0], r = joyZone.getBoundingClientRect();
+          const dx = THREE.MathUtils.clamp((t.clientX - (r.left + r.width / 2)) / 36, -1, 1);
+          const dy = THREE.MathUtils.clamp((t.clientY - (r.top + r.height / 2)) / 36, -1, 1);
+          joyInput.x = dx; joyInput.y = dy;
+          joyStick.style.transform = `translate(${dx * 28}px, ${dy * 28}px)`;
+        }, { passive: false });
+        joyZone.addEventListener('touchend', () => {
+          joyInput.x = 0; joyInput.y = 0;
+          joyStick.style.transform = 'translate(0, 0)';
+        });
+      }
+      if (joyZone) joyZone.addEventListener('touchcancel', () => { joyInput.x = 0; joyInput.y = 0; joyStick.style.transform = 'translate(0, 0)'; });
+      const lookZone = document.getElementById('look-zone');
+      let touchLookX = 0, touchLookY = 0;
+      if (lookZone) {
+        lookZone.addEventListener('touchstart', (e) => { touchLookX = e.touches[0].clientX; touchLookY = e.touches[0].clientY; }, { passive: true });
+        lookZone.addEventListener('touchmove', (e) => {
+          if (state.isCinematic || state.isPaused || state.isNoteOpen || state.finalTriggered) return;
+          const t = e.touches[0];
+          state.yaw -= (t.clientX - touchLookX) * 0.006;
+          state.pitch = THREE.MathUtils.clamp(state.pitch - (t.clientY - touchLookY) * 0.006, -1.25, 1.25);
+          touchLookX = t.clientX; touchLookY = t.clientY;
+        }, { passive: true });
+      }
+      document.getElementById('m-flash').onclick = () => { if (state.battery > 1) { state.flashlightOn = !state.flashlightOn; audio.playFlashlightClick(); } };
+      document.getElementById('m-crouch').onclick = () => { state.isCrouching = !state.isCrouching; };
+      document.getElementById('m-interact').onclick = handleInteract;
+      document.getElementById('m-attack').onclick = performAction;
+      document.getElementById('m-drop').onclick = dropWeapon; document.getElementById('m-journal').onclick = openJournal;
+      document.getElementById('m-swap').onclick = () => {
+        const order = ['sulo', 'krus', 'punyal', 'agimat', 'asin'].filter(k => state.ownedWeapons[k]);
+        if (!order.length) return;
+        const next = order[(order.indexOf(state.equippedWeapon) + 1) % order.length];
+        equipWeapon(next);
+      };
+
+      function isPlayerHidden() {
+        if (!state.isCrouching) return false;
+        return hideZones.some(hz => Math.hypot(state.pos.x - hz.x, state.pos.z - hz.z) < hz.radius);
+      }
+
+      /* ---------------- MISYON CHECKLIST ---------------- */
+      const missionDone = {};
+      let missionInit = false, missionHTML = '';
+      const MISSIONS = [
+        { id: 'arch',   text: 'Siyasatin ang karatula sa pasukan ng Sitio', test: () => collectedDocs.some(d => d.id === 'arch_sign'), target: () => [-2.1, 42] },
+        { id: 'house',  text: 'Suriin ang Lumang Bahay-Kahoy at kasunduan', test: () => collectedDocs.some(d => d.id === 'house_ledger'), target: () => [houseX - 2.2, houseZ + 1.8] },
+        { id: 'room',   text: 'Buksan ang Silid-Angkan (4-1-8) at kunin ang talaan', test: () => state.ev1, target: () => [houseX - 1.8, houseZ - 2.6] },
+        { id: 'grave',  text: 'Siyasatin ang lapida sa Sementeryo', test: () => state.ev2, target: () => [8.7, 2.2] },
+        { id: 'chapel', text: 'Lutasin ang Altar ng mga Larawan sa Kapilya', test: () => state.chapelAltarSolved, target: () => [chapX, chapZ - 2.3] },
+        { id: 'ritual', text: 'Bumaba sa Silid-Ritwal at tuklasin ang lihim', test: () => state.finalTriggered, target: () => [0, -45] }
+      ];
+      function updateMissions() {
+        let nextFound = false, html = '';
+        MISSIONS.forEach(m => {
+          if (!missionDone[m.id] && m.test()) {
+            missionDone[m.id] = true;
+            if (missionInit) showToast('✔ Natapos: ' + m.text);
+          }
+          const done = !!missionDone[m.id];
+          let cls = done ? 'done' : '', dist = '';
+          if (!done && !nextFound) {
+            nextFound = true; cls = 'next';
+            const t = m.target && m.target();
+            if (t && DIFF.hint > 0) dist = `<span class="dist">▸ ${Math.round(Math.hypot(t[0] - state.pos.x, t[1] - state.pos.z))}m</span>`;
+          }
+          html += `<li class="${cls}">${done ? '✔' : '○'} ${m.text}${dist}</li>`;
+        });
+        missionInit = true;
+        if (html !== missionHTML) { missionHTML = html; document.getElementById('mission-list').innerHTML = html; }
+      }
+
+      // Intro Sequence (ACT I — ANG PAGTAKAS)
+      setAct(1);
+      document.body.classList.add('cinematic');
+      const banner = document.getElementById('chapter-banner'); banner.classList.add('visible');
+      showSubtitle('ELIAS', '"Nakalabas na ako sa lagusan ng bundok... Pero bakit pakiramdam ko ay hindi pa ako nakakatakas?"', '"I escaped the mountain passage... Yet it feels as though I haven\'t escaped at all."', 4800);
+      later(() => banner.classList.remove('visible'), 3600);
+      later(() => { state.isCinematic = false; document.body.classList.remove('cinematic'); }, 4500);
+
+      let rafId = null; const clock = new THREE.Clock();
+      function animate() {
+        rafId = requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+        const elapsed = clock.getElapsedTime();
+
+        swayFoliage.forEach(f => { f.mesh.rotation.z = Math.sin(elapsed * 1.4 + f.phase) * 0.045; });
+        interactables.forEach(it => {
+          if (it.kind === 'weapon' && it.mesh) {
+            if (it.baseY === undefined) it.baseY = it.mesh.position.y;
+            it.mesh.position.y = it.baseY + Math.sin(elapsed * 2 + it.baseY * 5) * 0.06;
+          }
+        });
+
+        // Handle Final Cinematic Camera & Mateo Aswang Transformation
+        if (state.finalTriggered) {
+          rig.viewModelGroup.visible = false;
+          if (state.finalePhase === 1) {
+            // Unnatural slow head-turn toward Mateo (0 -> Math.PI over ~3.4s)
+            state.finaleTimer += dt;
+            const t = Math.min(1, state.finaleTimer / 3.4);
+            const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            state.yaw = ease * Math.PI;
+            state.pitch = THREE.MathUtils.lerp(-0.18, 0.04, ease);
+            camera.rotation.set(state.pitch, state.yaw, Math.sin(elapsed * 9) * 0.025);
+          } else if (state.finalePhase === 2) {
+            // PAGBABAGO: Mateo (may mukha) -> Aswang ng Chapter 1
+            state.finaleTimer += dt;
+            const m = Math.min(1, state.finaleTimer / 4.2), k = Math.max(0, Math.min(1, (m - 0.55) / 0.35));
+            if (m < 0.55) {
+              const g = mateoH.group;
+              g.position.x = (Math.random() - 0.5) * 0.06 * m; g.rotation.z = Math.sin(elapsed * 31) * 0.07 * m;
+              mateoH.patch.material.emissive.setRGB(0.33 + m * 0.7, 0.33 - m * 0.2, 0.33 - m * 0.2);
+              updateFace(mateoH.face, dt, elapsed, { open: Math.abs(Math.sin(elapsed * 16)) * m, mood: m });
+              revealLight.intensity = 2.6 + Math.sin(elapsed * 50) * 1.4 * m;
+            } else if (!state.morphed) {
+              state.morphed = true;
+              mateoH.group.visible = false; aswangA.group.visible = true;
+              audio.playScareBoom(); audio.playCreatureScreech(); state.shake = 1.2;
+              const sf = document.getElementById('scare-flash'); sf.style.opacity = '0.9'; later(() => { sf.style.opacity = '0'; }, 140);
+            }
+            if (state.morphed) {
+              const ws = 0.25 + 1.1 * k;
+              aswangA.leftWing.scale.set(ws, ws, 1); aswangA.rightWing.scale.set(ws, ws, 1);
+              aswangA.leftWing.rotation.y = 0.2 + Math.sin(elapsed * 9) * 0.25 * k; aswangA.rightWing.rotation.y = -0.2 - Math.sin(elapsed * 9) * 0.25 * k;
+              aswangA.group.scale.setScalar(0.9 + k * 0.2);
+              updateFace(aswangA.face, dt, elapsed, { open: 0.5 + 0.5 * Math.sin(elapsed * 14), mood: 1 });
+              revealLight.intensity = 3.4 + Math.sin(elapsed * 60) * 1.8;
+            }
+            camera.rotation.set(0.04 + (Math.random() - 0.5) * 0.02 * m, Math.PI + (Math.random() - 0.5) * 0.02 * m, 0);
+          } else if (state.finalePhase === 3) {
+            // LUNGE: sumugod ang aswang sa mukha ni Elias
+            state.finaleTimer += dt;
+            const l = Math.min(1, state.finaleTimer / 0.5), e = l * l * (3 - 2 * l), sc = 1.1 + 0.5 * e;
+            aswangA.group.scale.setScalar(sc);
+            mateoEntity.root.position.set(0, (1.72 - 2.12 * sc) * e, THREE.MathUtils.lerp(-39.4, -43.0, e));
+            updateFace(aswangA.face, dt, elapsed, { open: 1, mood: 1 });
+            aswangA.leftWing.rotation.y = 0.2 + Math.sin(elapsed * 45) * 0.35; aswangA.rightWing.rotation.y = -0.2 - Math.sin(elapsed * 45) * 0.35;
+            revealLight.position.set(0, 2.0, -42.4); revealLight.intensity = Math.sin(elapsed * 90) > 0 ? 10 : 3;
+            camera.position.x = (Math.random() - 0.5) * 0.3; camera.position.y = 1.72 + (Math.random() - 0.5) * 0.3;
+            camera.rotation.z = (Math.random() - 0.5) * 0.12;
+          }
+          renderer.render(scene, camera);
+          return;
+        }
+
+        if (state.jumpscareCooldown > 0) state.jumpscareCooldown -= dt;
+        if (state.jumpscareTimer > 0) {
+          state.jumpscareTimer -= dt;
+          const jp = 1 - Math.max(0, state.jumpscareTimer) / 0.75, jsc = 0.75 + jp * 1.1;
+          scareAswang.group.scale.setScalar(jsc);
+          scarePropGroup.position.set((Math.random() - 0.5) * 0.06, -2.1 * jsc + 0.1, -0.95 + jp * 0.15);
+          scarePropGroup.rotation.z = (Math.random() - 0.5) * 0.12;
+          updateFace(scareAswang.face, dt, elapsed, { open: 1, mood: 1 });
+          scareAswang.leftWing.rotation.y = 0.2 + Math.sin(elapsed * 40) * 0.3; scareAswang.rightWing.rotation.y = -0.2 - Math.sin(elapsed * 40) * 0.3;
+        }
+
+        if (state.isPlaying && !state.isPaused && !state.isGameOver) {
+          if (state.isCinematic) {
+            state.pos.z -= dt * 1.7;
+            camera.position.set(state.pos.x, 1.72, state.pos.z);
+            camera.rotation.set(state.pitch, state.yaw, 0);
+          } else if (!state.isNoteOpen) {
+            let moveForward = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0) - joyInput.y;
+            let moveRight = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0) + joyInput.x;
+            const inputLen = Math.hypot(moveForward, moveRight);
+            if (inputLen > 1) { moveForward /= inputLen; moveRight /= inputLen; }
+
+            const wantsSprint = (keys['ShiftLeft'] || keys['ShiftRight']) && moveForward > 0.2 && !state.isCrouching;
+            state.stamina = wantsSprint && state.stamina > 5 ? Math.max(0, state.stamina - dt * 24) : Math.min(100, state.stamina + dt * 14);
+            const speed = state.isCrouching ? 2.1 : (wantsSprint && state.stamina > 5 ? 5.6 : 3.5);
+            const fVec = new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+            const rVec = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
+            const mv = new THREE.Vector3().addScaledVector(fVec, moveForward * speed * dt).addScaledVector(rVec, moveRight * speed * dt);
+
+            const blocked = (nx, nz) => Math.abs(nx) > 36 || nz < -51 || nz > 57 || colliders.some(c => nx + 0.42 > c.minX && nx - 0.42 < c.maxX && nz + 0.42 > c.minZ && nz - 0.42 < c.maxZ);
+            if (!blocked(state.pos.x + mv.x, state.pos.z)) state.pos.x += mv.x;
+            if (!blocked(state.pos.x, state.pos.z + mv.z)) state.pos.z += mv.z;
+            state.pos.y = THREE.MathUtils.lerp(state.pos.y, state.isCrouching ? 1.02 : 1.72, dt * 10);
+
+            if (inputLen > 0.1) {
+              state.bobTimer += dt * (wantsSprint ? 13 : 8.5);
+              state.stepTimer -= dt * (wantsSprint ? 1.6 : 1.0);
+              if (state.stepTimer <= 0) { state.stepTimer = 0.46; audio.playFootstep(wantsSprint); }
+            }
+            camera.position.set(state.pos.x, state.pos.y + (inputLen > 0.1 ? Math.sin(state.bobTimer) * 0.03 : 0), state.pos.z);
+            camera.rotation.set(state.pitch, state.yaw, 0);
+
+            // Brief Mateo sighting events
+            mateoSightings.forEach(s => {
+              if (!s.done && state.pos.z < s.zTrigger) {
+                s.done = true;
+                mateoH.group.visible = true; aswangA.group.visible = false; mateoEntity.root.visible = true;
+                mateoEntity.root.position.set(s.x, 0, s.z);
+                mateoEntity.root.lookAt(state.pos.x, 0, state.pos.z);
+                audio.playWhisperSpatial(s.x < 0 ? -0.8 : 0.8, 1.0);
+                if (s.scare) later(() => scriptedScare('SI MATEO... MAY PANGIL AT PAKPAK!'), 1900);
+                showSubtitle('ELIAS', `"${s.line}"`, '', 3800);
+                later(() => { if (!state.finalTriggered) mateoEntity.root.visible = false; }, 2800);
+              }
+            });
+
+            if (mateoEntity.root.visible && mateoH.group.visible) updateFace(mateoH.face, dt, elapsed, { open: 0, mood: 0 });
+            scareTriggers.forEach(sc => { if (!sc.done && sc.test()) { sc.done = true; sc.run(); } });
+            state.whisperTimer -= dt;
+            if (state.whisperTimer <= 0) {
+              state.whisperTimer = 11 + Math.random() * 8;
+              audio.playWhisperSpatial(Math.random() * 1.6 - 0.8, 0.95);
+            }
+          }
+
+          // Flashlight
+          rig.fpFlashlightBody.visible = state.flashlightOn && state.battery > 0;
+          if (state.flashlightOn && state.battery > 0) {
+            state.battery = Math.max(0, state.battery - dt * DIFF.batt);
+            flashlight.intensity = state.battery < 14 ? (Math.sin(elapsed * 32) > 0.35 ? 1.2 : 5.8) : 6.6;
+            if (state.battery <= 0) { state.flashlightOn = false; flashlight.intensity = 0; showToast('Namatay ang plaslayt!'); }
+          } else flashlight.intensity = 0;
+          if (state.flickerT > 0) { state.flickerT -= dt; flashlight.intensity = Math.random() > 0.55 ? flashlight.intensity * 0.4 : 0; }
+          flashlight.position.copy(camera.position);
+          const lDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+          flashlightTarget.position.copy(camera.position).addScaledVector(lDir, 10);
+
+          if (state.saltWardTimer > 0) state.saltWardTimer -= dt;
+          if (state.attackCooldown > 0) state.attackCooldown -= dt;
+          if (state.swingAnim > 0) state.swingAnim = Math.max(0, state.swingAnim - dt * 3.8);
+          const st = 1 - state.swingAnim; let sw = 0;
+          if (state.swingAnim > 0) sw = st < 0.25 ? (st / 0.25) * 0.55 : st < 0.5 ? 0.55 - ((st - 0.25) / 0.25) * 1.5 : -0.95 * (1 - (st - 0.5) / 0.5);
+          rig.rightArmRig.root.rotation.set(0.32 + sw + Math.sin(elapsed * 1.6) * 0.012, -0.14 - sw * 0.3, 0.08 - sw * 0.25);
+          rig.rightArmRig.root.position.y = -0.35 + Math.sin(state.bobTimer) * 0.008;
+
+          // New Supernatural Threats AI (Wakwak, Ligaw na Kaluluwa, Sigbin)
+          const hidden = isPlayerHidden();
+          let closestDist = 999;
+          threats.forEach(t => {
+            if (t.dead) return;
+            if (t.stun > 0) { t.stun -= dt; return; }
+            if (t.cooldown > 0) t.cooldown -= dt;
+            const toP = new THREE.Vector3().subVectors(state.pos, t.group.position); toP.y = 0;
+            const d = toP.length();
+            if (d < closestDist) closestDist = d;
+            t.group.lookAt(state.pos.x, 0, state.pos.z);
+
+            if (t.kind === 'wakwak' && t.group.userData.wingL) {
+              t.group.userData.wingL.rotation.z = Math.sin(elapsed * 14) * 0.45;
+              t.group.userData.wingR.rotation.z = -Math.sin(elapsed * 14) * 0.45;
+            }
+
+            const aggroRange = hidden ? 3.2 : (state.flashlightOn ? 15 : 8.5);
+            if (d < aggroRange && state.saltWardTimer <= 0 && (t.kind !== 'sigbin' || state.pos.z < -22)) {
+              const spd = t.kind === 'sigbin' ? DIFF.speed * 0.92 : 2.55;
+              if (d > 1.75) {
+                t.group.position.addScaledVector(toP.normalize(), spd * dt);
+              } else if (t.cooldown <= 0) {
+                t.cooldown = 8.0;
+                const scareText = t.kind === 'wakwak'
+                  ? 'Bumaba ang Wakwak mula sa bubong!'
+                  : t.kind === 'sigbin'
+                    ? 'Sinunggaban ka ng Sigbin sa dilim!'
+                    : 'Niyakap ka ng malamig na Kaluluwa sa sementeryo!';
+                triggerJumpscare(t.kind, 13, scareText);
+              }
+            } else {
+              t.phase += dt * 0.7;
+              const wx = t.home.x + Math.cos(t.phase) * 2.8 - t.group.position.x, wz = t.home.z + Math.sin(t.phase) * 2.8 - t.group.position.z, wl = Math.hypot(wx, wz);
+              if (wl > 0.001) { const stp = Math.min(wl, 3.2 * dt); t.group.position.x += wx / wl * stp; t.group.position.z += wz / wl * stp; }
+            }
+          });
+
+          // Interaction Raycast
+          const fwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw);
+          currentHovered = null;
+          let bestDist = 3.4;
+          for (const it of interactables) {
+            const toIt = new THREE.Vector3().subVectors(it.pos, state.pos); toIt.y = 0;
+            const d = toIt.length();
+            if (d < (it.radius || 2.6) && d < bestDist && fwd.dot(toIt.normalize()) > 0.52) { bestDist = d; currentHovered = it; }
+          }
+          const promptEl = document.getElementById('interact-prompt');
+          if (currentHovered && !state.isCinematic && !state.isNoteOpen) {
+            document.getElementById('reticle').classList.add('interactive');
+            promptEl.innerHTML = `<span class="key-badge">E</span> ${currentHovered.prompt}`;
+            promptEl.classList.add('visible');
+          } else {
+            document.getElementById('reticle').classList.remove('interactive');
+            promptEl.classList.remove('visible');
+          }
+
+          updateMissions();
+          const threatProx = THREE.MathUtils.clamp(1 - closestDist / 18, 0, 1);
+          audio.update(dt, threatProx, state.ownedWeapons.agimat);
+
+          document.getElementById('hp-val').textContent = `${Math.ceil(state.hp)}%`;
+          document.getElementById('health-fill').style.width = `${state.hp}%`;
+          document.getElementById('stam-val').textContent = `${Math.ceil(state.stamina)}%`;
+          document.getElementById('stamina-fill').style.width = `${state.stamina}%`;
+          document.getElementById('bat-val').textContent = `${Math.ceil(state.battery)}%`;
+          document.getElementById('battery-fill').style.width = `${state.battery}%`;
+
+          const stealthEl = document.getElementById('stealth-indicator');
+          const stealthText = document.getElementById('stealth-text');
+          stealthEl.classList.remove('hidden-state', 'danger-state');
+          if (closestDist < 5 && !hidden) { stealthEl.classList.add('danger-state'); stealthText.textContent = 'MAY KALAPIT NA ANINO!'; }
+          else if (hidden) { stealthEl.classList.add('hidden-state'); stealthText.textContent = 'NAKATAGO SA DILIM'; }
+          else if (state.isCrouching) stealthText.textContent = 'NAKAYUKO';
+          else stealthText.textContent = 'NAKIKITA';
+
+          if (state.shake > 0) {
+            state.shake = Math.max(0, state.shake - dt * 1.4);
+            camera.position.x += (Math.random() - 0.5) * 0.2 * state.shake;
+            camera.position.y += (Math.random() - 0.5) * 0.2 * state.shake;
+          }
+        }
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      activeCleanup = () => {
+        cancelAnimationFrame(rafId); timers.forEach(clearTimeout); timers.clear();
+        document.removeEventListener('pointerlockchange', onLockChange); window.removeEventListener('blur', onBlur);
+        window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp);
+        canvas.removeEventListener('mousedown', onMouseDown); document.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp);
+      };
+    }
+
+    document.getElementById('start-game-btn').addEventListener('click', () => {
+      audio.init(); document.getElementById('start-screen').classList.add('hidden');
+      document.body.classList.remove('menu-open'); launchChapter3(null);
+    });
+    document.getElementById('load-save-btn').addEventListener('click', () => {
+      const saved = loadProgress(); if (!saved) return;
+      audio.init(); document.getElementById('start-screen').classList.add('hidden');
+      document.body.classList.remove('menu-open'); launchChapter3(saved);
+    });
+    document.getElementById('restart-btn').addEventListener('click', () => window.location.reload());
+    document.getElementById('end-restart-btn').addEventListener('click', () => window.location.reload());
+    document.getElementById('finale-replay-btn').addEventListener('click', () => window.location.reload());
+  })();
+  </script>
+</body>
+</html>
