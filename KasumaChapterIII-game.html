@@ -1447,6 +1447,7 @@
     function saveProgress(payload) {
       try {
         localStorage.setItem(SAVE_KEY, JSON.stringify({ ...payload, timestamp: Date.now() }));
+        try { localStorage.setItem('kasuma_progress', JSON.stringify({ chapter: 3, timestamp: Date.now() })); } catch (_) {}
         showToast('Nai-save ang checkpoint sa Chapter 3!');
         refreshLoadBtn();
       } catch (_) {}
@@ -2767,6 +2768,7 @@
       audio.init(); document.getElementById('start-screen').classList.add('hidden');
       document.body.classList.remove('menu-open'); launchChapter3(saved);
     });
+    if (/[?&]load=1/.test(location.search) && loadProgress()) document.getElementById('load-save-btn').click();
     document.getElementById('restart-btn').addEventListener('click', () => window.location.reload());
     document.getElementById('end-restart-btn').addEventListener('click', () => window.location.reload());
     document.getElementById('finale-replay-btn').addEventListener('click', () => window.location.reload());
