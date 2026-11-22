@@ -1902,17 +1902,42 @@
         }
       }
 
-      function finishChapter2() {
-        if (state.isGameOver) return;
-        state.isGameOver = true; state.isPlaying = false;
-        try { document.exitPointerLock?.(); } catch (_) {}
-        document.getElementById('end-title').textContent = 'NAKALABAS SA GUBAT';
-        document.getElementById('end-title').style.color = '#e5c37a';
-        document.getElementById('end-sub').textContent = 'Nakaligtas si Elias sa Gubat na Bumubulong, ngunit sa dilim ng bundok ay maririnig pa rin ang mga yapak ng Higanteng Kapre...';
-        const q = document.getElementById('end-quote'); q.style.display = 'block';
-        q.textContent = '"Kapag tinawag ang pangalan mo sa gubat, huwag kang lilingon."';
-        document.getElementById('end-screen').classList.remove('hidden');
-      }
+     function finishChapter2() {
+  if (state.isGameOver) return;
+  state.isGameOver = true;
+  state.isPlaying = false;
+  try { document.exitPointerLock?.(); } catch (_) {}
+
+  // I-save ang status ni Elias para madala sa Chapter 3
+  try {
+    localStorage.setItem('kasuma_carryover', JSON.stringify({
+      hp: state.hp ?? 100,
+      battery: state.battery ?? 100,
+      difficulty: typeof diffId !== 'undefined' ? diffId : 'normal',
+      weapons: state.weapons ?? [],
+      completedChapter: 2
+    }));
+  } catch (_) {}
+
+  document.getElementById('end-title').textContent = 'NAKALABAS SA GUBAT';
+  document.getElementById('end-title').style.color = '#e5c37a';
+  document.getElementById('end-sub').textContent = 'Nakaligtas si Elias sa Gubat na Bumubulong, ngunit sa dilim ng bundok ay maririnig pa rin ang mga yapak ng Higanteng Kapre...';
+
+  const q = document.getElementById('end-quote');
+  q.style.display = 'block';
+  q.textContent = '"Kapag tinawag ang pangalan mo sa gubat, huwag kang lilingon."';
+
+  // I-connect ang button sa Chapter 3
+  const btn = document.getElementById('end-restart-btn');
+  if (btn) {
+    btn.textContent = 'MAGPATULOY SA CHAPTER 3 →';
+    btn.onclick = () => {
+      window.location.href = 'KasumaChapterlll.html';
+    };
+  }
+
+  document.getElementById('end-screen').classList.remove('hidden');
+}
 
       const keys = {}; let isDraggingLook = false, prevX = 0, prevY = 0; const joyInput = { x: 0, y: 0 };
       function onKeyDown(e) {
