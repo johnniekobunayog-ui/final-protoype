@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tl">
 <head>
   <meta charset="UTF-8" />
@@ -184,6 +184,13 @@
       color: var(--text-muted);
       margin-top: 3px;
     }
+
+    #mission-list { list-style: none; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 0.72rem; line-height: 1.55; }
+    #mission-list li { color: var(--text-muted); }
+    #mission-list li.done { color: #7ed99c; text-decoration: line-through; opacity: 0.7; }
+    #mission-list li.next { color: #fff; font-weight: 600; }
+    #mission-list li.opt::after { content: ' (opsyonal)'; font-size: 0.62rem; opacity: 0.7; }
+    #mission-list .dist { color: var(--accent-gold); margin-left: 4px; }
 
     #top-right-hud {
       position: absolute;
@@ -790,6 +797,7 @@
       <div id="objective-label">MISYON • ANG HANDAAN</div>
       <div id="objective-text">Maglakad patungo sa baryo at kausapin si Mateo</div>
       <div id="objective-sub">Sundan ang maputik na daan patungo sa siga at arko ng pista.</div>
+      <ul id="mission-list"></ul>
     </div>
 
     <div id="top-right-hud">
@@ -907,6 +915,9 @@
         Unang beses pa lang tumuntong ni <strong>Elias</strong> sa baryo ng kaibigan niyang si Mateo, na nag-imbita sa kanya sa isang handaan. Wala siyang kakilala roon kundi si Mateo—at sa likod ng tugtugan, nagkukubli ang mga halimaw na nagpapanggap na tao. May duguang babala na iniwan sa daan ng mga naunang bisita:
         <em>"Huwag na huwag kang kakain ng iniaalok ng hindi mo kilala... baka laman ng nawawala ang isinubo mo."</em>
       </p>
+      <div style="margin-bottom:12px; padding-top:4px; font-size:0.84rem; line-height:1.6; color:#fff;">
+        <strong style="color:#e07a22; letter-spacing:0.15em;">MISYON:</strong> Kausapin si <strong>Mateo</strong>, siyasatin ang handaan (huwag kakain!), kumuha ng <strong>sandata</strong>, at hanapin ang <strong>3 sulat</strong> sa mga kahon sa likod ng mga kubo at kapilya. Makaligtas sa nilalang, lutasin ang <strong>kodigo</strong> ng tarangkahan, kunin ang <strong>Itak</strong> at putulin ang baging, saka tumakas patungong kagubatan.
+      </div>
       <div class="controls-grid">
         <span><strong>WASD</strong> — Maglakad</span>
         <span><strong>MOUSE / DRAG</strong> — Lumingon</span>
@@ -1707,6 +1718,42 @@
         { title: 'Tumakas patungo sa kagubatan (Chapter 2)', sub: 'Pindutin ang [E] sa tarangkahan upang makalabas sa baryo.', sub2: 'Pindutin ang [E] sa tarangkahan.', sub3: '' }
       ];
 
+      /* ---------------- MISYON CHECKLIST ---------------- */
+      const missionDone = {};
+      let missionInit = false, missionHTML = '';
+      const nearestOf = (list) => { list = list.filter(Boolean); list.sort((p, q) => Math.hypot(p[0] - state.pos.x, p[1] - state.pos.z) - Math.hypot(q[0] - state.pos.x, q[1] - state.pos.z)); return list[0] || null; };
+      const weaponSpot = (type) => { const w = worldWeapons.find(e => e.weaponType === type && e.mesh); return w ? [w.mesh.position.x, w.mesh.position.z] : null; };
+      const MISSIONS = [
+        { id: 'mateo', text: 'Kausapin si Mateo sa may siga', test: () => state.talkedMateo, target: () => [-2.2, 22.5] },
+        { id: 'food',  text: 'Siyasatin ang handaan (huwag kakain!)', test: () => state.inspectedFood, target: () => [0, 4] },
+        { id: 'weap',  text: 'Kumuha ng sandata sa likod ng mga kubo', test: () => state.ownedWeapons.sulo || state.ownedWeapons.buntot_pagi || state.ownedWeapons.itak, target: () => nearestOf(['sulo', 'buntot_pagi', 'itak'].map(weaponSpot)) },
+        { id: 'agi',   text: 'Hanapin ang Anting-Anting', opt: true, test: () => state.hasAntingAnting || state.ownedWeapons.agimat, target: () => [16.5, -13.5] },
+        { id: 'clues', text: () => `Hanapin ang 3 sulat sa mga kahon (${state.cluesFound}/3)`, test: () => state.cluesFound >= 3, target: () => nearestOf(interactables.filter(i => i.kind === 'note' && !i.opened).map(i => [i.pos.x, i.pos.z])) },
+        { id: 'creat', text: 'Makaligtas sa nilalang — hataw [Click] o magtago [C]', test: () => state.creatureRepelled, target: () => null },
+        { id: 'itak',  text: 'Kunin ang Itak (pamutol ng baging)', test: () => state.ownedWeapons.itak, target: () => weaponSpot('itak') },
+        { id: 'seal',  text: 'Ilagay ang kodigo sa selyo ng tarangkahan', test: () => state.sealOpen, target: () => [0, -24.5] },
+        { id: 'vine',  text: 'Putulin ang baging gamit ang Itak [Click]', test: () => state.gateVinesCut, target: () => [0, -24.5] },
+        { id: 'run',   text: 'Tumakas sa tarangkahan [E]', test: () => false, target: () => [0, -24.5] }
+      ];
+      function updateMissions() {
+        let nextFound = false, html = '';
+        MISSIONS.forEach(m => {
+          const label = () => typeof m.text === 'function' ? m.text() : m.text;
+          if (!missionDone[m.id] && m.test()) { missionDone[m.id] = true; if (missionInit) showToast('✔ Natapos: ' + label().replace(/ \(\d\/3\)/, '')); }
+          const done = !!missionDone[m.id];
+          let cls = done ? 'done' : '', dist = '';
+          if (!done && !nextFound && !m.opt) {
+            nextFound = true; cls = 'next';
+            const t = m.target && m.target();
+            if (t && DIFF.hint > 0) dist = `<span class="dist">▸ ${Math.round(Math.hypot(t[0] - state.pos.x, t[1] - state.pos.z))}m</span>`;
+          }
+          if (m.opt) cls += ' opt';
+          html += `<li class="${cls}">${done ? '✔' : '○'} ${label()}${dist}</li>`;
+        });
+        missionInit = true;
+        if (html !== missionHTML) { missionHTML = html; document.getElementById('mission-list').innerHTML = html; }
+      }
+
       function refreshObjective() {
         const obj = OBJECTIVES[state.objectiveIndex];
         document.getElementById('objective-text').textContent = obj.title;
@@ -2363,19 +2410,20 @@
         itak: createWeapon3DModel('itak'),
         agimat: createWeapon3DModel('agimat')
       };
-      Object.values(fpWeapons).forEach(w => {
-        w.visible = false;
-        w.scale.setScalar(0.72);
-        w.position.set(0, 0.02, -0.18);
-        w.rotation.set(Math.PI / 2.6, 0, 0);
+      // gy = bahagi ng modelo na hawak ng kamay, rx = pagkiling (negatibo = ang dulo ay nakaturo palayo kay Elias)
+      const GRIP = {
+        sulo:        { gy: -0.28, rx: -0.85, rz: 0.10, s: 0.72 },
+        buntot_pagi: { gy: -0.05, rx: -1.05, rz: 0.12, s: 0.80 },
+        itak:        { gy: -0.05, rx: -1.15, rz: 0.15, s: 0.80 },
+        agimat:      { gy: 0.0,   rx: -0.25, rz: 0,    s: 1.60 }
+      };
+      Object.keys(fpWeapons).forEach(k => {
+        const w = fpWeapons[k], c = GRIP[k];
+        w.visible = false; w.scale.setScalar(c.s); w.rotation.set(c.rx, 0, c.rz);
+        const off = new THREE.Vector3(0, -c.gy * c.s, 0).applyEuler(w.rotation);
+        w.position.set(off.x, 0.03 + off.y, -0.06 + off.z);
         rightArmRig.handGroup.add(w);
       });
-      fpWeapons.buntot_pagi.rotation.set(-1.25, 0, 0); // ang latigo ay nakaharap sa unahan, hindi kay Elias
-      fpWeapons.buntot_pagi.position.set(0, 0.0, -0.1);
-      fpWeapons.agimat.rotation.set(-0.35, 0, 0);
-      fpWeapons.agimat.position.set(0, 0.05, -0.14);
-      fpWeapons.itak.rotation.set(-1.2, 0, 0); // talim paharap, hindi paharap kay Elias
-      fpWeapons.itak.position.set(0, 0.0, -0.1);
 
       const suloHandLight = new THREE.PointLight(0xff7b1c, 0, 15, 1.4);
       suloHandLight.position.set(0.35, -0.1, -0.65);
@@ -3311,6 +3359,7 @@
           if (creatureGroup.position.z < -34) {
             enemyAI.active = false;
             creatureGroup.visible = false;
+            state.creatureRepelled = true;
             showToast('Umatras ang nilalang sa dilim!');
             if (state.objectiveIndex < 5) {
               if (state.cluesFound >= 3) {
@@ -3735,6 +3784,7 @@ const codeInput = [0, 0, 0];
             '"Elias! Thank you for coming, even though it is your first time here. You do not know anyone here but me, so stay close to me. Please, do not taste any food at the feast."',
             6200
           );
+          state.talkedMateo = true;
           if (state.objectiveIndex === 0) setObjective(1);
           askChoice([
             { text: 'Salamat, Mateo. Hindi ako kakain.', en: 'Thank you, Mateo. I will not eat.', fn: () => showSubtitle('MATEO', '"Mabuti. Mag-ingat ka, Elias."', '"Good. Be careful, Elias."', 3800) },
@@ -4066,6 +4116,7 @@ const codeInput = [0, 0, 0];
           document.body.classList.remove('cinematic');
           showToast('Mag-click sa screen para lumingon gamit ang mouse • [F] plaslayt • [E] kunin / kausapin');
         }, 5300);
+        setTimeout(() => { if (!state.isGameOver) showSubtitle('ELIAS', '"Hahanapin ko muna si Mateo sa may siga. Pagkatapos, aalamin ko kung bakit ako binalaan sa handaan."', '"I\'ll find Mateo by the bonfire first, then learn why I was warned about the feast."', 6500); }, 6200);
       }
 
       function togglePause() {
@@ -4317,12 +4368,11 @@ const codeInput = [0, 0, 0];
               -0.35 + bobY + crouchOffsetY - swingArc * 0.12,
               -0.44 - swingArc * 0.18
             );
-            rightArmRig.root.rotation.set(
-              0.32 + swingArc * 1.05,
-              -0.14 + swingArc * 0.45,
-              0.08 - swingArc * 0.52
-            );
+            const sT = 1 - state.swingAnim; let sw = 0;
+            if (state.swingAnim > 0) sw = sT < 0.25 ? (sT / 0.25) * 0.55 : sT < 0.5 ? 0.55 - ((sT - 0.25) / 0.25) * 1.5 : -0.95 * (1 - (sT - 0.5) / 0.5);
+            rightArmRig.root.rotation.set(0.32 + sw, -0.14 - sw * 0.3, 0.08 - sw * 0.25);
 
+            updateMissions();
             updateEnemyAI(dt);
             updateAmbush(dt);
             let threatProximity = 0;
