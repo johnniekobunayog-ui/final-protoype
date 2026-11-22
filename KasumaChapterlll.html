@@ -1,402 +1,419 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KASÚMA - ANG INIWAN KUBO</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KASÚMA - ANG INIWAN KUBO</title>
 
-<style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-body {
-    width: 100%;
-    min-height: 100vh;
-    background: #000;
-    color: white;
-    font-family: Georgia, serif;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
+        body {
+            width: 100%;
+            min-height: 100vh;
+            background: #000;
+            color: white;
+            font-family: Georgia, serif;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
 
-.background {
-    position: fixed;
-    inset: 0;
-    background: #000;
-    z-index: -2;
-}
+        .background {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: -2;
+        }
 
-.overlay {
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(
-        circle,
-        rgba(70, 0, 0, 0.12),
-        #000 75%
-    );
-    z-index: -1;
-}
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle,
+                    rgba(70, 0, 0, 0.12),
+                    #000 75%);
+            z-index: -1;
+        }
 
-/* MAIN CONTAINER */
+        /* MAIN CONTAINER */
 
-.container {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    padding: 35px 25px 65px;
-}
+        .container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 35px 25px 65px;
+        }
 
-/* CHAPTER */
+        /* CHAPTER */
 
-.chapter {
-    color: #a30000;
-    letter-spacing: 7px;
-    font-size: 13px;
-    margin-bottom: 12px;
-    opacity: 0;
-    animation: fadeIn 2s forwards;
-}
+        .chapter {
+            color: #a30000;
+            letter-spacing: 7px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            opacity: 0;
+            animation: fadeIn 2s forwards;
+        }
 
-/* LOGO */
+        /* LOGO */
 
-.logo-wrap {
-    position: relative;
-    width: 75%;
-    max-width: 420px;
-    margin: 0 auto 12px;
-    overflow: hidden;
-    opacity: 0;
-    animation:
-        logoAppear 2s ease forwards,
-        logoFloat 5s ease-in-out 2s infinite;
-}
+        .logo-wrap {
+            position: relative;
+            width: 75%;
+            max-width: 420px;
+            margin: 0 auto 12px;
+            overflow: hidden;
+            opacity: 0;
+            animation:
+                logoAppear 2s ease forwards,
+                logoFloat 5s ease-in-out 2s infinite;
+        }
 
-.game-logo {
-    display: block;
-    width: 100%;
-    height: auto;
-    object-fit: contain;
-    filter:
-        drop-shadow(0 0 5px rgba(180, 0, 0, .7))
-        drop-shadow(0 0 12px rgba(120, 0, 0, .4));
-    animation: logoGlow 3s ease-in-out infinite;
-}
+        .game-logo {
+            display: block;
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            filter:
+                drop-shadow(0 0 5px rgba(180, 0, 0, .7)) drop-shadow(0 0 12px rgba(120, 0, 0, .4));
+            animation: logoGlow 3s ease-in-out infinite;
+        }
 
-/* LOGO EFFECTS */
+        /* LOGO EFFECTS */
 
-@keyframes logoFloat {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-6px);
-    }
-}
+        @keyframes logoFloat {
 
-@keyframes logoGlow {
-    0%, 100% {
-        filter:
-            drop-shadow(0 0 5px rgba(180, 0, 0, .7))
-            drop-shadow(0 0 12px rgba(120, 0, 0, .4));
-    }
-    50% {
-        filter:
-            drop-shadow(0 0 9px red)
-            drop-shadow(0 0 20px rgba(180, 0, 0, .7));
-    }
-}
+            0%,
+            100% {
+                transform: translateY(0);
+            }
 
-.logo-wrap::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -120%;
-    width: 55%;
-    height: 100%;
-    background: linear-gradient(
-        110deg,
-        transparent,
-        rgba(255,255,255,.17),
-        transparent
-    );
-    transform: skewX(-25deg);
-    animation: logoShine 7s ease-in-out infinite;
-    pointer-events: none;
-}
+            50% {
+                transform: translateY(-6px);
+            }
+        }
 
-@keyframes logoShine {
-    0%, 65% {
-        left: -120%;
-    }
-    85%, 100% {
-        left: 150%;
-    }
-}
+        @keyframes logoGlow {
 
-@keyframes logoAppear {
-    from {
-        opacity: 0;
-        transform: translateY(20px) scale(.92);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
+            0%,
+            100% {
+                filter:
+                    drop-shadow(0 0 5px rgba(180, 0, 0, .7)) drop-shadow(0 0 12px rgba(120, 0, 0, .4));
+            }
 
-/* SUBTITLE */
+            50% {
+                filter:
+                    drop-shadow(0 0 9px red) drop-shadow(0 0 20px rgba(180, 0, 0, .7));
+            }
+        }
 
-.subtitle {
-    font-size: 13px;
-    letter-spacing: 5px;
-    color: #aaa;
-    margin-bottom: 30px;
-    opacity: 0;
-    animation: fadeIn 3s 1s forwards;
-}
+        .logo-wrap::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -120%;
+            width: 55%;
+            height: 100%;
+            background: linear-gradient(110deg,
+                    transparent,
+                    rgba(255, 255, 255, .17),
+                    transparent);
+            transform: skewX(-25deg);
+            animation: logoShine 7s ease-in-out infinite;
+            pointer-events: none;
+        }
 
-/* STORY */
+        @keyframes logoShine {
 
-.story {
-    max-width: 720px;
-    line-height: 2;
-    font-size: 16px;
-    color: #c5c5c5;
-    opacity: 0;
-    animation: fadeIn 3s 2s forwards;
-}
+            0%,
+            65% {
+                left: -120%;
+            }
 
-.story p {
-    margin-bottom: 13px;
-}
+            85%,
+            100% {
+                left: 150%;
+            }
+        }
 
-.story .warning {
-    color: #a60000;
-    font-style: italic;
-    margin-top: 20px;
-    text-shadow: 0 0 8px rgba(150,0,0,.5);
-}
+        @keyframes logoAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(.92);
+            }
 
-/* BUTTONS */
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
 
-.buttons {
-    margin-top: 25px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    opacity: 0;
-    animation: fadeIn 2s 5s forwards;
-}
+        /* SUBTITLE */
 
-button {
-    min-width: 230px;
-    padding: 14px 25px;
-    background: transparent;
-    border: 1px solid #760000;
-    color: white;
-    font-size: 12px;
-    letter-spacing: 4px;
-    cursor: pointer;
-    transition: .3s;
-}
+        .subtitle {
+            font-size: 13px;
+            letter-spacing: 5px;
+            color: #aaa;
+            margin-bottom: 30px;
+            opacity: 0;
+            animation: fadeIn 3s 1s forwards;
+        }
 
-button:hover {
-    background: #850000;
-    box-shadow: 0 0 20px #850000;
-}
+        /* STORY */
 
-.back {
-    border: none;
-    color: #777;
-}
+        .story {
+            max-width: 720px;
+            line-height: 2;
+            font-size: 16px;
+            color: #c5c5c5;
+            opacity: 0;
+            animation: fadeIn 3s 2s forwards;
+        }
 
-.back:hover {
-    background: transparent;
-    color: white;
-    box-shadow: none;
-}
+        .story p {
+            margin-bottom: 13px;
+        }
 
-/* DATE */
+        .story .warning {
+            color: #a60000;
+            font-style: italic;
+            margin-top: 20px;
+            text-shadow: 0 0 8px rgba(150, 0, 0, .5);
+        }
 
-.date {
-    position: fixed;
-    bottom: 20px;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    color: #555;
-    font-size: 10px;
-    letter-spacing: 3px;
-    pointer-events: none;
-}
+        /* BUTTONS */
 
-/* FADE IN */
+        .buttons {
+            margin-top: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            opacity: 0;
+            animation: fadeIn 2s 5s forwards;
+        }
 
-@keyframes fadeIn {
-    to {
-        opacity: 1;
-    }
-}
+        button {
+            min-width: 230px;
+            padding: 14px 25px;
+            background: transparent;
+            border: 1px solid #760000;
+            color: white;
+            font-size: 12px;
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: .3s;
+        }
 
-/* RESPONSIVE */
+        button:hover {
+            background: #850000;
+            box-shadow: 0 0 20px #850000;
+        }
 
-@media(max-width: 600px) {
-    .container {
-        padding: 25px 18px 75px;
-    }
+        .back {
+            border: none;
+            color: #777;
+        }
 
-    .chapter {
-        font-size: 11px;
-        margin-bottom: 10px;
-    }
+        .back:hover {
+            background: transparent;
+            color: white;
+            box-shadow: none;
+        }
 
-    .logo-wrap {
-        width: 85%;
-        max-width: 300px;
-    }
+        /* DATE */
 
-    .subtitle {
-        font-size: 11px;
-        letter-spacing: 3px;
-        margin-bottom: 25px;
-    }
+        .date {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: #555;
+            font-size: 10px;
+            letter-spacing: 3px;
+            pointer-events: none;
+        }
 
-    .story {
-        font-size: 13px;
-        line-height: 1.8;
-    }
+        /* FADE IN */
 
-    .story p {
-        margin-bottom: 10px;
-    }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
 
-    button {
-        min-width: 210px;
-        padding: 12px 20px;
-        font-size: 11px;
-    }
+        /* RESPONSIVE */
 
-    .date {
-        font-size: 9px;
-        bottom: 10px;
-    }
-}
+        @media(max-width: 600px) {
+            .container {
+                padding: 25px 18px 75px;
+            }
 
-/* REDUCED MOTION */
+            .chapter {
+                font-size: 11px;
+                margin-bottom: 10px;
+            }
 
-@media (prefers-reduced-motion: reduce) {
-    .chapter,
-    .logo-wrap,
-    .game-logo,
-    .logo-wrap::after,
-    .subtitle,
-    .story,
-    .buttons {
-        animation: none;
-        opacity: 1;
-    }
-}
-</style>
+            .logo-wrap {
+                width: 85%;
+                max-width: 300px;
+            }
+
+            .subtitle {
+                font-size: 11px;
+                letter-spacing: 3px;
+                margin-bottom: 25px;
+            }
+
+            .story {
+                font-size: 13px;
+                line-height: 1.8;
+            }
+
+            .story p {
+                margin-bottom: 10px;
+            }
+
+            button {
+                min-width: 210px;
+                padding: 12px 20px;
+                font-size: 11px;
+            }
+
+            .date {
+                font-size: 9px;
+                bottom: 10px;
+            }
+        }
+
+        /* REDUCED MOTION */
+
+        @media (prefers-reduced-motion: reduce) {
+
+            .chapter,
+            .logo-wrap,
+            .game-logo,
+            .logo-wrap::after,
+            .subtitle,
+            .story,
+            .buttons {
+                animation: none;
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="background"></div>
-<div class="overlay"></div>
+    <div class="background"></div>
+    <div class="overlay"></div>
 
-<main class="container">
+    <main class="container">
 
-    <div class="chapter">
-        KABANATA III
-    </div>
-
-    <div class="logo-wrap">
-        <img
-            src="logokasuma.png"
-            alt="KASÚMA Logo"
-            class="game-logo"
-        >
-    </div>
-
-    <div class="subtitle">
-        ANG INIWANG KUBO
-    </div>
-
-    <div class="story">
-
-        <p>
-            After escaping the creature in the forest, Elias and his companions continued searching for shelter. 
-            Not far from the trail, they discovered an old wooden hut hidden among the trees. 
-            With no other place to go, they decided to enter.
-        </p>
-
-        <p>
-           Inside, everything was covered in dust. Old photographs hung on the walls, broken furniture filled the corners, and a strange diary rested on a wooden table.
-           Elias opened the diary and began reading its pages. 
-           The entries spoke of missing villagers, 
-           strange visitors, and a terrible secret that had been kept hidden for years. 
-        </p>
-
-        <p>
-           Then, one of his companions noticed something unusual.
-           There were fresh footprints near the back door.
-           Someone had been inside the hut.
-        </p>
-
-        <p>
-            Before they could investigate further, 
-            three slow knocks came from the front door.
-             Nobody moved.
-        </p>
-
-        <p>
-            A familiar voice called Elias by his name.
-            But how could anyone know they were there?
-        </p>
-
-        <p class="warning">
-           “May mga pintong hindi dapat binubuksan, at may mga tinig na hindi dapat pinaniniwalaan.”
-        </p>
-
-    </div>
-
-    <div class="buttons">
-
-        <button id="continueBtn">
+        <div class="chapter">
             KABANATA III
-        </button>
+        </div>
 
-        <button class="back" id="backBtn">
-            BALIK SA MENU
-        </button>
+        <div class="logo-wrap">
+            <img src="logokasuma.png" alt="KASÚMA Logo" class="game-logo">
+        </div>
 
+        <div class="subtitle">
+            ANG INIWANG KUBO
+        </div>
+
+        <div class="story">
+
+            <p>
+                After surviving the terrifying encounters deep within the forest, Elias and his companions finally
+                discovered an old wooden hut hidden beyond a narrow trail. Exhausted and with nowhere else to go, they
+                decided to take shelter inside.
+
+                The moment they stepped through the doorway, an unsettling silence filled the room. Dust-covered
+                furniture, faded photographs, and abandoned belongings suggested that someone had once lived there. Yet
+                something felt terribly wrong. The hut looked abandoned, but it did not feel empty.
+
+                While searching the rooms, Elias discovered an old diary beneath a pile of broken belongings. Its pages
+                contained accounts of missing villagers, strange figures seen wandering outside at night, and warnings
+                about something that had been living among them.
+            </p>
+
+            <p>
+                One entry caught his attention. It mentioned a series of unexplained disappearances and a family that
+                had vanished without leaving a trace. The final page contained only one sentence:
+
+                "Huwag na huwag mong bubuksan ang pinto kapag narinig mo ang sarili mong pangalan."
+
+                Suddenly, a loud thud came from the upper floor.
+
+                Everyone froze.
+
+                Mateo insisted that nobody had gone upstairs. But as Elias turned toward the staircase, he noticed a
+                shadow slowly disappearing at the end of the hallway.
+
+            <p>
+                Then came three slow knocks from the front door.
+
+                Nobody answered.
+            </p>
+
+            <p>
+                A familiar voice spoke from the other side.
+
+                It sounded exactly like someone they had left behind in the forest.
+            </p>
+
+            <p>
+                But there was one problem.
+
+                That person was already standing inside the hut.
+            </p>
+
+            <p class="warning">
+                “May mga lihim na nakabaon sa loob ng kubo. At may mga nilalang na hindi kailanman umalis.”
+            </p>
+
+        </div>
+
+        <div class="buttons">
+
+            <button id="continueBtn">
+                KABANATA III
+            </button>
+
+            <button class="back" id="backBtn">
+                BALIK SA MENU
+            </button>
+
+        </div>
+
+    </main>
+
+    <div class="date">
+        PHILIPPINES — 1998
     </div>
 
-</main>
+    <script>
+        const continueBtn = document.getElementById("continueBtn");
+        const backBtn = document.getElementById("backBtn");
 
-<div class="date">
-    PHILIPPINES — 1998
-</div>
+        continueBtn.addEventListener("click", () => {
+            window.location.href = "kasumaChapterIII-game.html";
+        });
 
-<script>
-const continueBtn = document.getElementById("continueBtn");
-const backBtn = document.getElementById("backBtn");
-
-continueBtn.addEventListener("click", () => {
-    window.location.href = "KasumaChapterIII-game.html";
-});
-
-backBtn.addEventListener("click", () => {
-    window.location.href = "index.html";
-});
-</script>
+        backBtn.addEventListener("click", () => {
+            window.location.href = "index.html";
+        });
+    </script>
 
 </body>
+
 </html>
