@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KASÚMA — Chapter 2: Ang Gubat na Bumubulong</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #060807;
+      --accent-blood: #a81818;
+      --accent-ember: #e07a22;
+      --accent-gold: #c9a66b;
+      --text-main: #e8e4dc;
+      --text-muted: #9a9488;
+      --hud-glass: rgba(10, 12, 14, 0.78);
+      --hud-border: rgba(201, 166, 107, 0.3);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background-color: var(--bg-dark); font-family: 'Inter', sans-serif; color: var(--text-main); }
+
+    #game-canvas { display: block; width: 100%; height: 100%; position: fixed; inset: 0; z-index: 1; cursor: crosshair; }
+    #vignette-layer { position: fixed; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(circle at center, transparent 38%, rgba(0, 0, 0, 0.92) 100%); }
+    #damage-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0; background: radial-gradient(circle at center, transparent 28%, rgba(175, 10, 10, 0.92) 100%); transition: opacity 0.2s ease; }
+    #curse-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 7; opacity: 0; mix-blend-mode: screen; background: radial-gradient(circle at 30% 40%, rgba(130, 18, 145, 0.4), transparent 60%), radial-gradient(circle at 70% 60%, rgba(185, 15, 15, 0.45), transparent 60%); transition: opacity 0.25s ease; }
+    #anting-pulse { position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0; box-shadow: inset 0 0 95px rgba(212, 155, 56, 0.65); transition: opacity 0.15s ease; }
+    #scare-flash { position: fixed; inset: 0; pointer-events: none; z-index: 12; opacity: 0; background: radial-gradient(circle at center, rgba(255,220,200,0.5) 0%, rgba(205,0,0,0.88) 65%, rgba(45,0,0,0.98) 100%); transition: opacity 0.08s ease; }
+    #scare-dark { position: fixed; inset: 0; pointer-events: none; z-index: 11; opacity: 0; background: radial-gradient(circle at center, rgba(0,0,0,0.75) 0%, #000 75%); transition: opacity 0.08s ease; }
+    #film-grain { position: fixed; inset: 0; pointer-events: none; z-index: 8; opacity: 0.05; background-image: repeating-radial-gradient(#fff 0 0.0001%, #000 0 0.0002%); background-size: 120px 120px; }
+
+    .letterbox { position: fixed; left: 0; right: 0; height: 0vh; background: #000; z-index: 30; transition: height 0.65s cubic-bezier(0.22, 1, 0.36, 1); pointer-events: none; }
+    #letterbox-top { top: 0; }
+    #letterbox-bottom { bottom: 0; }
+    body.cinematic .letterbox { height: 10vh; }
+
+    #chapter-banner { position: fixed; top: 25%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 35; pointer-events: none; opacity: 0; transition: opacity 1s ease; }
+    #chapter-banner.visible { opacity: 1; }
+    #chapter-banner .sub { font-size: 0.8rem; letter-spacing: 0.42em; text-transform: uppercase; color: var(--accent-ember); margin-bottom: 0.5rem; }
+    #chapter-banner h2 { font-family: 'Cinzel', serif; font-size: clamp(1.6rem, 4.4vw, 3.1rem); font-weight: 900; letter-spacing: 0.15em; color: #f3efe6; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.95); }
+    #chapter-banner .line { width: 140px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-gold), transparent); margin: 0.8rem auto 0; }
+
+    #hud { position: fixed; inset: 0; z-index: 15; pointer-events: none; transition: opacity 0.35s ease; }
+    body.cinematic #hud, body.menu-open #hud { opacity: 0; }
+
+    #objective-panel { position: absolute; top: 20px; left: 22px; max-width: 380px; background: linear-gradient(90deg, rgba(8, 10, 12, 0.88) 0%, rgba(8, 10, 12, 0.35) 100%); border-left: 3px solid var(--accent-ember); padding: 10px 16px; border-radius: 0 8px 8px 0; backdrop-filter: blur(4px); }
+    #objective-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent-ember); margin-bottom: 4px; }
+    #objective-text { font-size: 0.92rem; font-weight: 500; line-height: 1.35; color: var(--text-main); }
+    #objective-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; }
+
+    #top-right-hud { position: absolute; top: 20px; right: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .hud-pill { background: var(--hud-glass); border: 1px solid var(--hud-border); padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; letter-spacing: 0.08em; display: flex; align-items: center; gap: 8px; backdrop-filter: blur(6px); }
+    #stealth-indicator.hidden-state { color: #7ed99c; border-color: rgba(126, 217, 156, 0.45); }
+    #stealth-indicator.danger-state { color: #ff5c5c; border-color: rgba(255, 92, 92, 0.65); }
+    #pause-btn-hud { pointer-events: auto; cursor: pointer; color: var(--text-main); transition: background 0.2s; }
+    #pause-btn-hud:hover { background: rgba(201, 166, 107, 0.2); }
+
+    #reticle-wrapper { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    #reticle { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.72); box-shadow: 0 0 6px rgba(0, 0, 0, 0.9); transition: all 0.15s ease; }
+    #reticle.interactive { width: 14px; height: 14px; background: transparent; border: 2px solid var(--accent-gold); transform: scale(1.15); }
+    #interact-prompt { background: rgba(10, 11, 14, 0.88); border: 1px solid var(--hud-border); padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; color: #fff; white-space: nowrap; opacity: 0; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease; box-shadow: 0 4px 16px rgba(0,0,0,0.65); }
+    #interact-prompt.visible { opacity: 1; transform: translateY(0); }
+    .key-badge { display: inline-block; background: var(--accent-gold); color: #0b0b0c; font-weight: 700; font-size: 0.72rem; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+
+    #vitals-panel { position: absolute; bottom: 22px; left: 22px; display: flex; flex-direction: column; gap: 8px; min-width: 210px; }
+    .bar-group { display: flex; flex-direction: column; gap: 3px; }
+    .bar-header { display: flex; justify-content: space-between; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+    .bar-track { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.12); border-radius: 99px; overflow: hidden; }
+    .bar-fill { height: 100%; width: 100%; border-radius: 99px; transition: width 0.15s ease; }
+    #health-fill { background: linear-gradient(90deg, #8b1818, #d93838); }
+    #stamina-fill { background: linear-gradient(90deg, #9c7c44, #e5c37a); }
+    #battery-fill { background: linear-gradient(90deg, #3c7a89, #7be0f7); }
+
+    #weapon-panel { position: absolute; bottom: 22px; right: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    #equipped-info { text-align: right; background: var(--hud-glass); border: 1px solid var(--hud-border); padding: 8px 14px; border-radius: 10px; backdrop-filter: blur(6px); }
+    #equipped-name { font-family: 'Cinzel', serif; font-size: 0.92rem; font-weight: 700; color: var(--accent-gold); }
+    #equipped-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    #weapon-slots { display: flex; gap: 6px; }
+    .w-slot { width: 58px; height: 44px; background: rgba(12, 14, 18, 0.78); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.63rem; color: var(--text-muted); position: relative; transition: all 0.15s ease; }
+    .w-slot.has-item { color: var(--text-main); border-color: rgba(201, 166, 107, 0.45); }
+    .w-slot.active { border-color: var(--accent-ember); background: rgba(224, 122, 34, 0.22); transform: translateY(-2px); }
+    .w-slot .slot-num { position: absolute; top: 3px; left: 5px; font-size: 0.6rem; opacity: 0.75; }
+
+    #subtitle-box { position: fixed; bottom: 13%; left: 50%; transform: translateX(-50%); max-width: min(720px, 90vw); background: rgba(6, 7, 9, 0.88); border: 1px solid rgba(201, 166, 107, 0.28); padding: 12px 22px; border-radius: 10px; text-align: center; z-index: 36; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.75); }
+    #subtitle-box.visible { opacity: 1; }
+    #subtitle-speaker { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-gold); margin-bottom: 4px; }
+    #subtitle-text { font-size: 0.96rem; line-height: 1.45; color: #f4f1ea; }
+    #subtitle-sub { font-size: 0.78rem; font-style: italic; color: var(--text-muted); margin-top: 3px; }
+
+    #toast-msg { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); background: rgba(15, 17, 21, 0.94); border: 1px solid var(--accent-gold); color: #f7f3eb; padding: 8px 18px; border-radius: 20px; font-size: 0.82rem; z-index: 25; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+    #toast-msg.visible { opacity: 1; }
+
+    #note-modal, #code-modal, #journal-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
+    #note-modal.open, #code-modal.open, #journal-modal.open { display: flex; }
+
+    .parchment { position: relative; background: linear-gradient(145deg, #272119, #191510); border: 1px solid #6b5638; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95), inset 0 0 40px rgba(0,0,0,0.6); max-width: 540px; width: 100%; padding: 30px; border-radius: 12px; color: #e6dcc8; }
+    .parchment h3 { font-family: 'Cinzel', serif; color: var(--accent-gold); font-size: 1.25rem; margin-bottom: 14px; border-bottom: 1px solid rgba(201, 166, 107, 0.25); padding-bottom: 8px; }
+    .parchment p { font-size: 0.95rem; line-height: 1.7; white-space: pre-line; margin-bottom: 16px; }
+    .parchment .translation { font-size: 0.82rem; font-style: italic; color: #a69b87; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 10px; }
+
+    .btn-primary { background: linear-gradient(135deg, #9e1b1b, #691010); border: 1px solid rgba(255, 160, 140, 0.35); color: #fff; padding: 12px 26px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.08em; cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease; }
+    .btn-primary:hover { filter: brightness(1.18); transform: translateY(-1px); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.22); color: var(--text-main); padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.16); }
+
+    .fullscreen-overlay { position: fixed; inset: 0; z-index: 60; background: radial-gradient(circle at center, rgba(16, 14, 14, 0.88) 0%, rgba(5, 6, 8, 0.98) 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; backdrop-filter: blur(8px); }
+    .fullscreen-overlay.hidden { display: none; }
+    .game-logo { font-family: 'Cinzel', serif; font-size: clamp(2.6rem, 7vw, 5rem); font-weight: 900; letter-spacing: 0.24em; color: #f4efe6; text-shadow: 0 0 40px rgba(158, 27, 27, 0.72); margin-bottom: 6px; }
+    .game-tagline { font-size: 0.84rem; letter-spacing: 0.28em; text-transform: uppercase; color: #ff3b3b; font-weight: 700; margin-bottom: 18px; }
+    .menu-card { background: rgba(12, 13, 17, 0.75); border: 1px solid rgba(255, 46, 46, 0.45); border-radius: 14px; padding: 22px; max-width: 580px; width: 100%; margin-bottom: 16px; text-align: left; }
+    .controls-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; font-size: 0.8rem; color: #f4efe6; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.14); }
+    .controls-grid span strong { color: #ff4545; }
+    .quality-row, .diff-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .quality-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .quality-btns, .diff-btns { display: flex; gap: 6px; }
+    .q-btn, .d-btn { padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.22); color: #fff; cursor: pointer; }
+    .q-btn.active { background: var(--accent-ember); color: #090909; border-color: var(--accent-ember); }
+    .d-btn.active { background: #c91818; border-color: #ff4545; }
+    #diff-desc { font-size: 0.78rem; line-height: 1.5; color: #f4efe6; margin-top: 10px; opacity: 0.9; }
+
+    #mobile-controls { position: fixed; inset: 0; z-index: 20; pointer-events: none; display: none; }
+    @media (pointer: coarse), (max-width: 900px) {
+      #mobile-controls { display: block; }
+      #vitals-panel { bottom: 155px; left: 14px; min-width: 150px; }
+      #weapon-panel { bottom: 155px; right: 14px; }
+    }
+    #joy-zone { position: absolute; bottom: 24px; left: 24px; width: 112px; height: 112px; border-radius: 50%; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.2); pointer-events: auto; touch-action: none; }
+    #joy-stick { position: absolute; top: 50%; left: 50%; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; background: rgba(201, 166, 107, 0.6); border: 1px solid #fff; }
+    #look-zone { position: absolute; top: 60px; right: 0; width: 55%; height: calc(100% - 210px); pointer-events: auto; touch-action: none; }
+    #mobile-action-btns { position: absolute; bottom: 22px; right: 18px; display: grid; grid-template-columns: repeat(3, 52px); gap: 8px; pointer-events: auto; }
+    .m-btn { width: 52px; height: 52px; border-radius: 50%; background: rgba(14, 16, 20, 0.8); border: 1px solid var(--hud-border); color: #fff; font-size: 0.66rem; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; touch-action: manipulation; }
+    .m-btn:active { background: var(--accent-ember); color: #000; }
+    .m-btn.atk { border-color: #d93838; background: rgba(139, 24, 24, 0.7); }
+
+    #code-wheels { display: flex; justify-content: center; gap: 18px; margin: 10px 0 14px; }
+    .wheel { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .wheel button { width: 54px; height: 30px; background: rgba(255,255,255,0.08); border: 1px solid rgba(201,166,107,0.4); color: #e6dcc8; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    .wheel .dig { width: 54px; height: 64px; display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; font-size: 2rem; font-weight: 900; color: #f3efe6; background: rgba(0,0,0,0.45); border: 1px solid #6b5638; border-radius: 8px; }
+    #code-msg { min-height: 1.3em; text-align: center; font-size: 0.85rem; color: #ff7b6b; margin-bottom: 10px; }
+    #journal-list { font-size: 0.88rem; line-height: 1.6; margin-bottom: 14px; max-height: 55vh; overflow-y: auto; }
+    #journal-list .j-item { border-left: 2px solid var(--accent-gold); padding-left: 10px; margin-bottom: 10px; }
+    #journal-list .j-item b { color: var(--accent-gold); }
+    #journal-list .j-empty { color: var(--text-muted); font-style: italic; margin-bottom: 10px; }
+  </style>
+</head>
+<body class="menu-open">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Atmosphere & Jumpscare Overlays -->
+  <div id="vignette-layer"></div>
+  <div id="damage-vignette"></div>
+  <div id="curse-overlay"></div>
+  <div id="anting-pulse"></div>
+  <div id="scare-flash"></div>
+  <div id="scare-dark"></div>
+  <div id="film-grain"></div>
+
+  <!-- Letterbox & Chapter 2 Banner -->
+  <div id="letterbox-top" class="letterbox"></div>
+  <div id="letterbox-bottom" class="letterbox"></div>
+  <div id="chapter-banner">
+    <div class="sub">KASÚMA • IKALAWANG KABANATA</div>
+    <h2>CHAPTER 2 — ANG GUBAT NA BUMUBULONG</h2>
+    <div class="line"></div>
+  </div>
+
+  <!-- Notifications & Subtitles -->
+  <div id="toast-msg"></div>
+  <div id="subtitle-box">
+    <div id="subtitle-speaker">ELIAS</div>
+    <div id="subtitle-text">...</div>
+    <div id="subtitle-sub"></div>
+  </div>
+
+  <!-- Main HUD -->
+  <div id="hud">
+    <div id="objective-panel">
+      <div id="objective-label">YUGTO 1 • PAGPASOK SA GUBAT</div>
+      <div id="objective-text">Maglakad papasok sa madilim na gubat</div>
+      <div id="objective-sub">Sundan ang maputik na landas at mag-ingat sa mga bumubulong.</div>
+    </div>
+
+    <div id="top-right-hud">
+      <button id="pause-btn-hud" class="hud-pill">[ESC] PAUSE / SAVE</button>
+      <div id="stealth-indicator" class="hud-pill">
+        <span id="stealth-icon">👁</span>
+        <span id="stealth-text">NAKIKITA</span>
+      </div>
+      <div id="clue-counter" class="hud-pill">PAHIWATIG: 0 / 3</div>
+    </div>
+
+    <div id="reticle-wrapper">
+      <div id="reticle"></div>
+      <div id="interact-prompt"><span class="key-badge">E</span> Siyasatin</div>
+    </div>
+
+    <div id="vitals-panel">
+      <div class="bar-group">
+        <div class="bar-header"><span>KALUSUGAN (HP)</span><span id="hp-val">100%</span></div>
+        <div class="bar-track"><div id="health-fill" class="bar-fill"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-header"><span>LAKAS (STAMINA)</span><span id="stam-val">100%</span></div>
+        <div class="bar-track"><div id="stamina-fill" class="bar-fill"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-header"><span>PANANGLAW (FLASHLIGHT) [F]</span><span id="bat-val">85%</span></div>
+        <div class="bar-track"><div id="battery-fill" class="bar-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="weapon-panel">
+      <div id="equipped-info">
+        <div id="equipped-name">SULO</div>
+        <div id="equipped-hint">[Left Click] Hataw / Gamitin • [1-5] Palit Gamit</div>
+      </div>
+      <div id="weapon-slots">
+        <div class="w-slot has-item active" id="slot-1"><span class="slot-num">1</span>SULO</div>
+        <div class="w-slot" id="slot-2"><span class="slot-num">2</span>PAGI</div>
+        <div class="w-slot" id="slot-3"><span class="slot-num">3</span>ITAK</div>
+        <div class="w-slot" id="slot-4"><span class="slot-num">4</span>AGIMAT</div>
+        <div class="w-slot" id="slot-5"><span class="slot-num">5</span>INSENSO</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Touch Controls -->
+  <div id="mobile-controls">
+    <div id="joy-zone"><div id="joy-stick"></div></div>
+    <div id="look-zone"></div>
+    <div id="mobile-action-btns">
+      <button class="m-btn" id="m-flash">PLAS</button>
+      <button class="m-btn" id="m-crouch">YUKO</button>
+      <button class="m-btn" id="m-swap">PALIT</button>
+      <button class="m-btn" id="m-drop">DROP</button>
+      <button class="m-btn" id="m-interact">KUNIN</button>
+      <button class="m-btn atk" id="m-attack">HAMPAS</button>
+      <button class="m-btn" id="m-journal">LIBRO</button>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div id="note-modal">
+    <div class="parchment">
+      <h3 id="note-title">Liham</h3>
+      <p id="note-body"></p>
+      <div id="note-trans" class="translation"></div>
+      <div style="margin-top: 20px; text-align: right;">
+        <button id="close-note-btn" class="btn-primary">[E / ESC] Isara ang Sulat</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="code-modal">
+    <div class="parchment">
+      <h3 id="code-modal-title">Selyo ng Anito (1998)</h3>
+      <p id="code-hint"></p>
+      <div id="code-wheels">
+        <div class="wheel"><button data-w="0" data-d="1">▲</button><div class="dig" id="dig-0">0</div><button data-w="0" data-d="-1">▼</button></div>
+        <div class="wheel"><button data-w="1" data-d="1">▲</button><div class="dig" id="dig-1">0</div><button data-w="1" data-d="-1">▼</button></div>
+        <div class="wheel"><button data-w="2" data-d="1">▲</button><div class="dig" id="dig-2">0</div><button data-w="2" data-d="-1">▼</button></div>
+      </div>
+      <div id="code-msg"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button id="code-close" class="btn-secondary">Isara</button>
+        <button id="code-try" class="btn-primary">Buksan ang Selyo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="journal-modal">
+    <div class="parchment">
+      <h3>Talaarawan ni Elias</h3>
+      <div id="journal-list"></div>
+      <div style="text-align:right;"><button id="journal-close" class="btn-primary">[J / ESC] Isara</button></div>
+    </div>
+  </div>
+
+  <!-- Start Screen (Chapter 2 Only) -->
+  <div id="start-screen" class="fullscreen-overlay">
+    <div class="game-logo">KASÚMA</div>
+    <div class="game-tagline">CHAPTER 2 — ANG GUBAT NA BUMUBULONG (1998)</div>
+    <div class="menu-card">
+      <p style="font-size: 0.92rem; line-height: 1.65; color: #fff;">
+        Matapos makatakas sa madugong handaan sa baryo, pumasok si <strong>Elias</strong> sa madilim at masukal na kagubatan. Sa likod ng mga higanteng puno ng Balete nagkukubli ang <strong style="color:#ff4545;">Higanteng Kapre</strong> at mga <strong style="color:#ff4545;">Maligno</strong> na nanggagaya ng boses sa dilim.
+      </p>
+      <div class="controls-grid">
+        <span><strong>WASD</strong> — Maglakad</span>
+        <span><strong>MOUSE / DRAG</strong> — Lumingon</span>
+        <span><strong>SHIFT</strong> — Tumakbo</span>
+        <span><strong>C / CTRL</strong> — Yumuko / Magtago</span>
+        <span><strong>F</strong> — Plaslayt On/Off</span>
+        <span><strong>E</strong> — Kunin / Basahin / Siyasatin</span>
+        <span><strong>1 - 5</strong> — Palit Gamit / Sandata</span>
+        <span><strong>G</strong> — Bitawan ang Gamit</span>
+        <span><strong>LEFT CLICK</strong> — Hataw / Magsindi Insenso</span>
+        <span><strong>J</strong> — Talaarawan (Journal)</span>
+      </div>
+      <div class="quality-row">
+        <span style="font-size: 0.8rem; font-weight: 600;">GRAPHICS QUALITY:</span>
+        <div class="quality-btns">
+          <button class="q-btn" data-q="low">LOW</button>
+          <button class="q-btn active" data-q="medium">MEDIUM</button>
+          <button class="q-btn" data-q="high">HIGH</button>
+        </div>
+      </div>
+    </div>
+    <div class="menu-card">
+      <div class="diff-head">
+        <span style="font-size: 0.8rem; font-weight: 600;">ANTAS NG HIRAP:</span>
+        <div class="diff-btns">
+          <button class="d-btn" data-d="easy">EASY</button>
+          <button class="d-btn active" data-d="medium">MEDIUM</button>
+          <button class="d-btn" data-d="expert">EXPERT</button>
+        </div>
+      </div>
+      <div id="diff-desc"></div>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;">
+      <button id="start-game-btn" class="btn-primary">SIMULAN ANG CHAPTER 2</button>
+      <button id="load-save-btn" class="btn-secondary" style="display:none;">IPAGPATULOY ANG SAVE</button>
+    </div>
+  </div>
+
+  <!-- Pause Screen -->
+  <div id="pause-screen" class="fullscreen-overlay hidden">
+    <div class="game-logo" style="font-size: 2.4rem;">NAKA-PAUSE</div>
+    <div class="game-tagline">CHAPTER 2 — ANG GUBAT NA BUMUBULONG</div>
+    <div class="menu-card">
+      <div style="font-size: 0.85rem; color: var(--accent-gold); margin-bottom: 8px;">GABAY SA KALIGTASAN:</div>
+      <ul style="font-size: 0.82rem; color: var(--text-muted); padding-left: 18px; line-height: 1.6;">
+        <li><strong>Higanteng Kapre:</strong> Makita ang baga ng tabako at usok niya sa itaas. Yumuko [C] sa damuhan o ugat ng Balete at patayin ang plaslayt [F].</li>
+        <li><strong>Mga Maligno:</strong> Nanggagaya ng boses ni Mateo at sumusulpot kapag hindi ka nakatingin. Hampasin gamit ang Sulo [1], Buntot Pagi [2], o Itak [3].</li>
+        <li><strong>Mangkok ng Insenso [5]:</strong> Pindutin ang Left Click upang itaboy ang Kapre at mga Maligno.</li>
+      </ul>
+      <div class="quality-row">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">GRAPHICS PRESET:</span>
+        <div class="quality-btns">
+          <button class="q-btn" data-q="low">LOW</button>
+          <button class="q-btn active" data-q="medium">MEDIUM</button>
+          <button class="q-btn" data-q="high">HIGH</button>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;">
+      <button id="resume-btn" class="btn-primary">IPAGPATULOY</button>
+      <button id="save-checkpoint-btn" class="btn-secondary">I-SAVE ANG CHECKPOINT</button>
+      <button id="restart-btn" class="btn-secondary">ULITIN ANG CHAPTER 2</button>
+    </div>
+  </div>
+
+  <!-- End Screen -->
+  <div id="end-screen" class="fullscreen-overlay hidden">
+    <div id="end-title" class="game-logo" style="font-size: 2.6rem;">NALAGOT ANG HININGA</div>
+    <div id="end-sub" class="game-tagline" style="max-width: 560px; line-height: 1.6; letter-spacing: 0.14em;">
+      Nilamon ka ng dilim sa Gubat na Bumubulong.
+    </div>
+    <div id="end-quote" style="font-family:'Cinzel',serif; font-size:1.05rem; color:#c9a66b; margin-top:10px; display:none;"></div>
+    <div style="display:flex; gap:12px; margin-top:18px; flex-wrap:wrap; justify-content:center;">
+      <button id="end-restart-btn" class="btn-primary">SUBUKAN MULI</button>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const THREE = window.THREE;
+    if (!THREE) return;
+
+    let subtitleTimeout = null;
+    function showSubtitle(speaker, tagalog, english, duration = 4800) {
+      const box = document.getElementById('subtitle-box');
+      document.getElementById('subtitle-speaker').textContent = speaker;
+      document.getElementById('subtitle-text').textContent = tagalog;
+      document.getElementById('subtitle-sub').textContent = english || '';
+      box.classList.add('visible');
+      clearTimeout(subtitleTimeout);
+      subtitleTimeout = setTimeout(() => box.classList.remove('visible'), duration);
+    }
+
+    let toastTimeout = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => el.classList.remove('visible'), 3000);
+    }
+
+    /* ------------------------------------------------------------------------
+       PROCEDURAL HORROR AUDIO ENGINE
+       ------------------------------------------------------------------------ */
+    class HorrorAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.ambienceGain = null;
+        this.isStarted = false;
+        this.heartbeatTimer = 0;
+        this.cricketTimer = 0;
+        this.creakTimer = 4.5;
+      }
+
+      init() {
+        try {
+          if (this.isStarted) {
+            if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+            return;
+          }
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          this.ctx = new AudioCtx();
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = 0.82;
+          this.masterGain.connect(this.ctx.destination);
+
+          this.ambienceGain = this.ctx.createGain();
+          this.ambienceGain.gain.value = 0.28;
+          this.ambienceGain.connect(this.masterGain);
+
+          this.startForestAmbience();
+          this.isStarted = true;
+        } catch (_) {}
+      }
+
+      startForestAmbience() {
+        try {
+          const bufferSize = this.ctx.sampleRate * 3;
+          const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let lastOut = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + 0.025 * white) / 1.025;
+            lastOut = output[i];
+            output[i] *= 2.8;
+          }
+          const wind = this.ctx.createBufferSource();
+          wind.buffer = noiseBuffer;
+          wind.loop = true;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = 260;
+          filter.Q.value = 1.1;
+
+          wind.connect(filter);
+          filter.connect(this.ambienceGain);
+          wind.start();
+        } catch (_) {}
+      }
+
+      update(dt, threatProximity, hasAnting) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          this.cricketTimer -= dt;
+          if (this.cricketTimer <= 0) {
+            this.cricketTimer = 1.2 + Math.random() * 2.2;
+            if (threatProximity < 0.65) this.playCricketChirp();
+          }
+          this.creakTimer -= dt;
+          if (this.creakTimer <= 0) {
+            this.creakTimer = 5.0 + Math.random() * 6.0;
+            this.playTreeGroan(Math.random() * 1.6 - 0.8);
+          }
+          if (threatProximity > 0.12) {
+            const rate = THREE.MathUtils.lerp(1.0, 0.28, threatProximity);
+            this.heartbeatTimer -= dt;
+            if (this.heartbeatTimer <= 0) {
+              this.heartbeatTimer = rate;
+              this.playHeartbeat(threatProximity, hasAnting);
+            }
+          }
+        } catch (_) {}
+      }
+
+      playTreeGroan(pan = 0) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(92, now);
+          osc.frequency.linearRampToValueAtTime(64, now + 1.1);
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.value = 240;
+          g.gain.setValueAtTime(0.001, now);
+          g.gain.linearRampToValueAtTime(0.06, now + 0.35);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+          const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+          osc.connect(lp); lp.connect(g);
+          if (panner) { panner.pan.value = THREE.MathUtils.clamp(pan, -1, 1); g.connect(panner); panner.connect(this.masterGain); }
+          else g.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 1.25);
+        } catch (_) {}
+      }
+
+      playCricketChirp() {
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          const baseFreq = 4200 + Math.random() * 550;
+          osc.frequency.setValueAtTime(baseFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.07, now + 0.06);
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.025, now + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+          osc.connect(gain); gain.connect(this.ambienceGain);
+          osc.start(now); osc.stop(now + 0.14);
+        } catch (_) {}
+      }
+
+      playHeartbeat(intensity, hasAnting) {
+        try {
+          const now = this.ctx.currentTime;
+          [0, 0.15].forEach((offset, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(idx === 0 ? 68 : 50, now + offset);
+            osc.frequency.exponentialRampToValueAtTime(26, now + offset + 0.14);
+            const vol = Math.min(0.55, intensity * 0.55);
+            gain.gain.setValueAtTime(0.001, now + offset);
+            gain.gain.linearRampToValueAtTime(vol, now + offset + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
+            osc.connect(gain); gain.connect(this.masterGain);
+            osc.start(now + offset); osc.stop(now + offset + 0.16);
+          });
+          if (hasAnting && intensity > 0.25) {
+            const chime = this.ctx.createOscillator();
+            const cGain = this.ctx.createGain();
+            chime.type = 'triangle';
+            chime.frequency.setValueAtTime(920, now);
+            cGain.gain.setValueAtTime(0.001, now);
+            cGain.gain.linearRampToValueAtTime(0.06 * intensity, now + 0.02);
+            cGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+            chime.connect(cGain); cGain.connect(this.masterGain);
+            chime.start(now); chime.stop(now + 0.42);
+          }
+        } catch (_) {}
+      }
+
+      playFootstep(isSprint = false) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(88, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.09);
+          gain.gain.setValueAtTime(isSprint ? 0.16 : 0.09, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.11);
+        } catch (_) {}
+      }
+
+      playHeavyThud(pan = 0, distanceRatio = 0.4) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(58, now);
+          osc.frequency.exponentialRampToValueAtTime(17, now + 0.48);
+          gain.gain.setValueAtTime(Math.max(0.08, (1 - distanceRatio) * 0.68), now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+          osc.connect(gain);
+          if (panner) { panner.pan.value = THREE.MathUtils.clamp(pan, -1, 1); gain.connect(panner); panner.connect(this.masterGain); }
+          else gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.52);
+        } catch (_) {}
+      }
+
+      playWhisperSpatial(pan = 0, pitchShift = 1.0) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const len = Math.floor(this.ctx.sampleRate * 1.45);
+          const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.sin((i / len) * Math.PI);
+          const src = this.ctx.createBufferSource();
+          src.buffer = buf;
+          const bp = this.ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.setValueAtTime(980 * pitchShift, now);
+          bp.frequency.linearRampToValueAtTime(1520 * pitchShift, now + 0.65);
+          bp.frequency.linearRampToValueAtTime(700 * pitchShift, now + 1.4);
+          bp.Q.value = 4.8;
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.24, now + 0.35);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.42);
+          const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+          src.connect(bp); bp.connect(gain);
+          if (panner) { panner.pan.value = THREE.MathUtils.clamp(pan, -1, 1); gain.connect(panner); panner.connect(this.masterGain); }
+          else gain.connect(this.masterGain);
+          src.start(now); src.stop(now + 1.45);
+        } catch (_) {}
+      }
+
+      playBranchSnap(pan = 0) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(480, now);
+          osc.frequency.exponentialRampToValueAtTime(85, now + 0.08);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+          osc.connect(gain);
+          if (panner) { panner.pan.value = THREE.MathUtils.clamp(pan, -1, 1); gain.connect(panner); panner.connect(this.masterGain); }
+          else gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.1);
+        } catch (_) {}
+      }
+
+      playFlashlightClick() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(1150, now);
+          osc.frequency.exponentialRampToValueAtTime(320, now + 0.035);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.045);
+        } catch (_) {}
+      }
+
+      playWeaponSwing(type) {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type === 'buntot_pagi' ? 'sawtooth' : 'triangle';
+          osc.frequency.setValueAtTime(type === 'buntot_pagi' ? 320 : 540, now);
+          osc.frequency.exponentialRampToValueAtTime(95, now + 0.22);
+          gain.gain.setValueAtTime(0.24, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.25);
+        } catch (_) {}
+      }
+
+      playWeaponDrop() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(210, now);
+          osc.frequency.exponentialRampToValueAtTime(65, now + 0.14);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.16);
+        } catch (_) {}
+      }
+
+      playJumpscareStinger() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          [110, 155.56, 493.88, 987.77].forEach((freq) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now);
+            osc.frequency.linearRampToValueAtTime(freq * 0.65, now + 1.15);
+            gain.gain.setValueAtTime(0.26, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+            osc.connect(gain); gain.connect(this.masterGain);
+            osc.start(now); osc.stop(now + 1.25);
+          });
+        } catch (_) {}
+      }
+
+      playCreatureScreech() {
+        if (!this.isStarted || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(880, now);
+          osc.frequency.exponentialRampToValueAtTime(220, now + 0.55);
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc.connect(gain); gain.connect(this.masterGain);
+          osc.start(now); osc.stop(now + 0.62);
+        } catch (_) {}
+      }
+    }
+
+    /* ------------------------------------------------------------------------
+       PROCEDURAL TEXTURES & 3D MODELS
+       ------------------------------------------------------------------------ */
+    function createProceduralTexture(type) {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      if (type === 'mud' || type === 'forest_floor') {
+        ctx.fillStyle = type === 'forest_floor' ? '#16140e' : '#241c15';
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 3400; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? (type === 'forest_floor' ? 'rgba(34, 44, 22, 0.45)' : 'rgba(54, 42, 31, 0.45)') : 'rgba(10, 9, 6, 0.62)';
+          ctx.beginPath(); ctx.arc(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (type === 'bark') {
+        ctx.fillStyle = '#211710'; ctx.fillRect(0, 0, 256, 256);
+        for (let x = 0; x < 256; x += 6) {
+          ctx.fillStyle = Math.random() > 0.45 ? '#140d08' : '#312318';
+          ctx.fillRect(x, 0, 3 + Math.random() * 4, 256);
+        }
+      } else if (type === 'bamboo') {
+        ctx.fillStyle = '#5a5233'; ctx.fillRect(0, 0, 256, 256);
+        for (let x = 0; x < 256; x += 16) {
+          ctx.fillStyle = x % 32 === 0 ? '#4a4328' : '#685f3c';
+          ctx.fillRect(x, 0, 14, 256);
+        }
+      } else if (type === 'nipa') {
+        ctx.fillStyle = '#3b2e1e'; ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 850; i++) {
+          const x = Math.random() * 256, y = Math.random() * 256;
+          ctx.strokeStyle = Math.random() > 0.4 ? '#524029' : '#261d12';
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 14, y + 24); ctx.stroke();
+        }
+      } else {
+        ctx.fillStyle = '#3b3c3e'; ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 1600; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? 'rgba(75,77,80,0.4)' : 'rgba(28,29,31,0.5)';
+          ctx.fillRect(Math.random() * 256, Math.random() * 256, 6, 6);
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createWeapon3DModel(type) {
+      const group = new THREE.Group();
+      if (type === 'sulo') {
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.85, 8), new THREE.MeshStandardMaterial({ color: 0x4a3219, roughness: 0.9 }));
+        const rag = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 0.22, 8), new THREE.MeshStandardMaterial({ color: 0x261a12, roughness: 1 }));
+        rag.position.y = 0.42;
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.26, 7), new THREE.MeshBasicMaterial({ color: 0xff8c1a }));
+        flame.position.y = 0.6;
+        group.add(stick, rag, flame);
+      } else if (type === 'buntot_pagi') {
+        const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.24, 8), new THREE.MeshStandardMaterial({ color: 0x3d2214 }));
+        const whip = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.95, 8), new THREE.MeshStandardMaterial({ color: 0x1c1b21, roughness: 0.45 }));
+        whip.position.y = 0.56;
+        group.add(grip, whip);
+      } else if (type === 'agimat') {
+        const cord = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.01, 6, 16), new THREE.MeshStandardMaterial({ color: 0x2a1c12 }));
+        const medal = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), new THREE.MeshStandardMaterial({ color: 0xd4af37, emissive: 0x5c4208, metalness: 0.85 }));
+        medal.position.y = -0.09;
+        group.add(cord, medal);
+      } else if (type === 'insenso') {
+        const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 0.09, 10), new THREE.MeshStandardMaterial({ color: 0x6b3a24 }));
+        const ember = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff5a1f }));
+        ember.position.y = 0.04;
+        group.add(bowl, ember);
+      } else {
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.035, 0.22, 8), new THREE.MeshStandardMaterial({ color: 0x422613 }));
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.68, 0.09), new THREE.MeshStandardMaterial({ color: 0xb8c0c8, metalness: 0.85 }));
+        blade.position.set(0, 0.44, 0.01);
+        group.add(handle, blade);
+      }
+      return group;
+    }
+
+    function buildFirstPersonArms(targetCamera) {
+      const viewModelGroup = new THREE.Group();
+      targetCamera.add(viewModelGroup);
+      const sleeveMat = new THREE.MeshStandardMaterial({ color: 0x354539, roughness: 0.85 });
+      const skinArmMat = new THREE.MeshStandardMaterial({ color: 0x946748, roughness: 0.68 });
+
+      function buildArmRig(side = 'right') {
+        const sign = side === 'right' ? 1 : -1;
+        const armPivot = new THREE.Group();
+        armPivot.position.set(sign * 0.34, -0.35, -0.44);
+        armPivot.rotation.set(0.32, -sign * 0.14, sign * 0.08);
+        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.055, 0.32, 10), sleeveMat);
+        sleeve.rotation.x = Math.PI / 2 - 0.18; sleeve.position.set(0, -0.05, 0.14);
+        const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.042, 0.16, 10), skinArmMat);
+        forearm.rotation.x = Math.PI / 2 - 0.12; forearm.position.set(0, -0.01, -0.05);
+        const handGroup = new THREE.Group();
+        handGroup.position.set(0, 0.0, -0.14);
+        const palm = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.036, 0.085), skinArmMat);
+        handGroup.add(palm);
+        armPivot.add(sleeve, forearm, handGroup);
+        return { root: armPivot, handGroup };
+      }
+
+      const rightArmRig = buildArmRig('right');
+      const leftArmRig = buildArmRig('left');
+      leftArmRig.root.position.set(-0.28, -0.41, -0.48);
+      leftArmRig.root.rotation.set(0.45, 0.22, -0.12);
+      viewModelGroup.add(rightArmRig.root, leftArmRig.root);
+
+      const fpFlashlightBody = new THREE.Group();
+      const torchBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.02, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0x1d2229, metalness: 0.8 }));
+      torchBarrel.rotation.x = Math.PI / 2;
+      fpFlashlightBody.add(torchBarrel);
+      fpFlashlightBody.position.set(0, -0.015, -0.055);
+      leftArmRig.handGroup.add(fpFlashlightBody);
+
+      const fpWeapons = {
+        sulo: createWeapon3DModel('sulo'),
+        buntot_pagi: createWeapon3DModel('buntot_pagi'),
+        itak: createWeapon3DModel('itak'),
+        agimat: createWeapon3DModel('agimat'),
+        insenso: createWeapon3DModel('insenso')
+      };
+      Object.values(fpWeapons).forEach(w => {
+        w.visible = false; w.scale.setScalar(0.72);
+        w.position.set(0, 0.02, -0.18); w.rotation.set(Math.PI / 2.6, 0, 0);
+        rightArmRig.handGroup.add(w);
+      });
+
+      const suloHandLight = new THREE.PointLight(0xff7b1c, 0, 15, 1.4);
+      suloHandLight.position.set(0.35, -0.1, -0.65);
+      viewModelGroup.add(suloHandLight);
+
+      return { rightArmRig, leftArmRig, fpFlashlightBody, fpWeapons, suloHandLight };
+    }
+
+    /* ------------------------------------------------------------------------
+       RENDERER, DIFFICULTY & SAVE SYSTEM
+       ------------------------------------------------------------------------ */
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.06;
+
+    const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 160);
+    camera.rotation.order = 'YXZ';
+
+    const audio = new HorrorAudioEngine();
+    const textures = {
+      mud: createProceduralTexture('mud'),
+      forestFloor: createProceduralTexture('forest_floor'),
+      bark: createProceduralTexture('bark'),
+      bamboo: createProceduralTexture('bamboo'),
+      nipa: createProceduralTexture('nipa'),
+      stone: createProceduralTexture('stone')
+    };
+    textures.mud.repeat.set(30, 30);
+    textures.forestFloor.repeat.set(42, 42);
+
+    const DIFFS = {
+      easy: { id: 'easy', dmg: 0.65, speed: 3.1, batt: 0.2, hint: 2, desc: 'MADALI — Mas malinaw ang gabay at mas mahina ang pinsala ng Kapre at Maligno.' },
+      medium: { id: 'medium', dmg: 1.0, speed: 3.9, batt: 0.34, hint: 1, desc: 'KATAMTAMAN — Madalas ang mga bulong at jumpscare. Kailangang magtago sa dilim at gumamit ng cover.' },
+      expert: { id: 'expert', dmg: 1.5, speed: 4.6, batt: 0.48, hint: 0, desc: 'EKSPERTO — Walang gabay. Sobrang bilis at mabagsik ang Higanteng Kapre at mga Maligno.' }
+    };
+
+    let selectedDifficulty = 'medium';
+    function applyDifficultyUI(id) {
+      selectedDifficulty = id;
+      const d = DIFFS[id] || DIFFS.medium;
+      document.querySelectorAll('.d-btn').forEach(b => b.classList.toggle('active', b.dataset.d === d.id));
+      document.getElementById('diff-desc').textContent = d.desc;
+    }
+    document.querySelectorAll('.d-btn').forEach(b => b.addEventListener('click', () => applyDifficultyUI(b.dataset.d)));
+    applyDifficultyUI('medium');
+
+    document.querySelectorAll('.q-btn').forEach(btn => btn.addEventListener('click', () => {
+      const preset = btn.dataset.q;
+      document.querySelectorAll('.q-btn').forEach(b => b.classList.toggle('active', b.dataset.q === preset));
+      renderer.setPixelRatio(preset === 'low' ? 1 : Math.min(window.devicePixelRatio || 1, preset === 'medium' ? 1.5 : 2));
+      renderer.shadowMap.enabled = preset !== 'low';
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }));
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const SAVE_KEY = 'kasuma_ch2_single_save';
+    function saveProgress(payload) {
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ ...payload, timestamp: Date.now() }));
+        showToast('Nai-save ang checkpoint sa Chapter 2!');
+        refreshLoadBtn();
+      } catch (_) {}
+    }
+    function loadProgress() {
+      try { const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+    }
+    function refreshLoadBtn() {
+      const btn = document.getElementById('load-save-btn');
+      if (btn) btn.style.display = loadProgress() ? 'inline-block' : 'none';
+    }
+    refreshLoadBtn();
+
+    /* ------------------------------------------------------------------------
+       LAUNCH CHAPTER 2
+       ------------------------------------------------------------------------ */
+    let activeCleanup = null;
+
+    function launchChapter2(savedState = null) {
+      if (activeCleanup) activeCleanup();
+
+      const diffId = savedState?.difficulty || selectedDifficulty || 'medium';
+      const DIFF = DIFFS[diffId] || DIFFS.medium;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x040706);
+      scene.fog = new THREE.FogExp2(0x050a08, 0.044);
+
+      camera.children.slice().forEach(c => camera.remove(c));
+      scene.add(camera);
+      const rig = buildFirstPersonArms(camera);
+
+      scene.add(new THREE.HemisphereLight(0x233831, 0x0f0b07, 0.45));
+      const moonLight = new THREE.DirectionalLight(0x668e84, 0.62);
+      moonLight.position.set(22, 48, -35);
+      moonLight.castShadow = true;
+      scene.add(moonLight);
+
+      const flashlight = new THREE.SpotLight(0xfff1d6, 6.4, 36, Math.PI / 5.3, 0.45, 1.1);
+      const flashlightTarget = new THREE.Object3D();
+      scene.add(flashlight, flashlightTarget);
+      flashlight.target = flashlightTarget;
+
+      // Jumpscare face-lunge prop attached to camera
+      const scarePropGroup = new THREE.Group();
+      scarePropGroup.visible = false;
+      const scareSkull = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), new THREE.MeshBasicMaterial({ color: 0x1c0606 }));
+      const scareJaw = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.22), new THREE.MeshBasicMaterial({ color: 0x090202 }));
+      scareJaw.position.set(0, -0.24, 0.08);
+      const scareEyeMat = new THREE.MeshBasicMaterial({ color: 0xff1e1e });
+      const sEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), scareEyeMat);
+      sEyeL.position.set(-0.1, 0.06, 0.27);
+      const sEyeR = sEyeL.clone(); sEyeR.position.x = 0.1;
+      scarePropGroup.add(scareSkull, scareJaw, sEyeL, sEyeR);
+      scarePropGroup.position.set(0, -0.05, -0.82);
+      camera.add(scarePropGroup);
+
+      const state = {
+        isPlaying: true, isPaused: false, isCinematic: true, isNoteOpen: false, isGameOver: false,
+        pos: new THREE.Vector3(0, 1.72, 52), yaw: 0, pitch: 0.02,
+        hp: savedState?.hp ?? 100, stamina: 100, battery: savedState?.battery ?? 85,
+        flashlightOn: true, isCrouching: false, isSprinting: false, bobTimer: 0, stepTimer: 0,
+        ownedWeapons: {
+          sulo: savedState?.ownedWeapons?.sulo ?? true,
+          buntot_pagi: savedState?.ownedWeapons?.buntot_pagi ?? false,
+          itak: savedState?.ownedWeapons?.itak ?? false,
+          agimat: savedState?.ownedWeapons?.agimat ?? false,
+          insenso: savedState?.ownedWeapons?.insenso ?? false
+        },
+        equippedWeapon: savedState?.equippedWeapon ?? 'sulo',
+        attackCooldown: 0, swingAnim: 0, insensoTimer: 0,
+        sequence: 1, cluesFound: 0, hutEntered: false, anitoPuzzleSolved: false, kapreSpotted: false,
+        shake: 0, jumpscareTimer: 0, jumpscareCooldown: 6.0, ambientWhisperTimer: 6.5
+      };
+
+      const SEQUENCES = {
+        1: { label: 'YUGTO 1 • PAGPASOK SA GUBAT', title: 'Maglakad papasok sa madilim na gubat', sub: 'Sundan ang maputik na landas at mag-ingat sa mga bumubulong.' },
+        2: { label: 'YUGTO 2 • ANG NAWAWALANG LANDAS', title: 'Siyasatin ang lumang karatula at marka sa Balete', sub: 'Pindutin ang [E] upang suriin ang mga palatandaan.' },
+        3: { label: 'YUGTO 3 • ANG MGA BUMUBULONG', title: 'Huwag magpalinlang sa boses na gumagaya kay Mateo', sub: 'May mga Maligno sa dilim. Mag-ingat sa biglaang pagsulpot nila.' },
+        4: { label: 'YUGTO 4 • ANG ANINO SA PUNO', title: 'Iwasan ang Higanteng Kapre at mga Maligno', sub: 'Yumuko [C] sa damuhan/ugat ng Balete at patayin ang ilaw [F] kapag papalapit siya.' },
+        5: { label: 'YUGTO 5 • ANG INIWANG SILUNGAN', title: 'Suriin ang lumang kubo at basahin ang talaarawan (1998)', sub: 'Alamin ang kodigo ng Selyo ng Anito at kumuha ng gamit.' },
+        6: { label: 'YUGTO 6 • ANG LIHIM NG GUBAT', title: 'Buksan ang Selyo ng Anito sa dulo ng gubat (9 - 8 - 4)', sub: 'Gamitin ang [E] sa Selyo ng Anito upang makalabas.' },
+        7: { label: 'YUGTO 7 • ANG HULING BABALA', title: 'Tumakbo palabas sa lihim na lagusan ng bundok', sub: 'Huwag nang lumingon—paparating na ang dilim!' }
+      };
+
+      function setSequence(seq) {
+        if (seq <= state.sequence && seq !== 1) return;
+        state.sequence = seq;
+        const s = SEQUENCES[seq];
+        if (!s) return;
+        document.getElementById('objective-label').textContent = s.label;
+        document.getElementById('objective-text').textContent = s.title;
+        document.getElementById('objective-sub').textContent = DIFF.hint === 0 ? '' : s.sub;
+      }
+
+      function triggerJumpscare(kind = 'maligno', hpDamage = 14, message = '') {
+        if (state.isGameOver || state.isPaused || state.isCinematic) return;
+        if (state.jumpscareCooldown > 0 && kind !== 'lethal') return;
+
+        state.jumpscareCooldown = 7.0;
+        state.jumpscareTimer = 0.65;
+        state.shake = Math.max(state.shake, 0.9);
+
+        if (hpDamage > 0) {
+          state.hp = Math.max(0, state.hp - hpDamage * DIFF.dmg);
+          const dmgVig = document.getElementById('damage-vignette');
+          dmgVig.style.opacity = '0.92';
+          setTimeout(() => { dmgVig.style.opacity = '0'; }, 420);
+        }
+
+        const flash = document.getElementById('scare-flash');
+        const dark = document.getElementById('scare-dark');
+        flash.style.opacity = '0.88';
+        dark.style.opacity = '0.75';
+
+        if (kind === 'kapre') {
+          audio.playHeavyThud(0, 0.05);
+          audio.playJumpscareStinger();
+          scarePropGroup.visible = true;
+          scarePropGroup.scale.setScalar(1.45);
+          showToast(message || 'DUMAGUNDONG ANG HIGANTENG KAPRE!');
+        } else {
+          audio.playCreatureScreech();
+          audio.playJumpscareStinger();
+          scarePropGroup.visible = true;
+          scarePropGroup.scale.setScalar(1.0);
+          showToast(message || 'SUMULPOT ANG MALIGNO SA DILIM!');
+        }
+
+        setTimeout(() => {
+          flash.style.opacity = '0';
+          dark.style.opacity = '0';
+          scarePropGroup.visible = false;
+        }, 460);
+
+        if (state.hp <= 0 && !state.isGameOver) {
+          state.isGameOver = true;
+          try { document.exitPointerLock?.(); } catch (_) {}
+          document.getElementById('end-title').textContent = 'NALAGOT ANG HININGA';
+          document.getElementById('end-sub').textContent = 'Nilamon ka ng Higanteng Kapre at mga Maligno sa Gubat na Bumubulong.';
+          document.getElementById('end-screen').classList.remove('hidden');
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         FOREST ENVIRONMENT, WEAPONS, CLUES, KAPRE & MALIGNOS
+         ---------------------------------------------------------------------- */
+      const colliders = [];
+      const hideZones = [];
+      const interactables = [];
+      const swayFoliage = [];
+      const falseTraps = [];
+
+      function addCollider(x, z, w, d) {
+        colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+      }
+
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(170, 170), new THREE.MeshStandardMaterial({ map: textures.forestFloor, roughness: 0.9 }));
+      ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+      scene.add(ground);
+
+      const trailMat = new THREE.MeshStandardMaterial({ map: textures.mud, roughness: 0.78 });
+      const trailNodes = [[0,52],[0,44],[-1.5,36],[-2.5,28],[-1.0,20],[1.8,12],[3.2,4],[1.5,-4],[-2.0,-12],[-4.5,-20],[-3.0,-28],[0,-36],[2.5,-44],[0,-54]];
+      for (let i = 0; i < trailNodes.length - 1; i++) {
+        const [x1, z1] = trailNodes[i], [x2, z2] = trailNodes[i + 1];
+        const seg = new THREE.Mesh(new THREE.PlaneGeometry(3.2, Math.hypot(x2 - x1, z2 - z1) + 1.2), trailMat);
+        seg.rotation.x = -Math.PI / 2; seg.rotation.z = -Math.atan2(x2 - x1, z2 - z1);
+        seg.position.set((x1 + x2) / 2, 0.012, (z1 + z2) / 2);
+        scene.add(seg);
+      }
+
+      const barkMat = new THREE.MeshStandardMaterial({ map: textures.bark, roughness: 0.94 });
+      const canopyMat = new THREE.MeshStandardMaterial({ color: 0x0a1910, roughness: 0.92 });
+      const rootMat = new THREE.MeshStandardMaterial({ color: 0x1c140c, roughness: 0.96 });
+
+      function createGiantBaleteTree(x, z, scale = 1.0, hasCarving = false) {
+        const tree = new THREE.Group();
+        tree.position.set(x, 0, z);
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.65 * scale, 1.15 * scale, 13 * scale, 10), barkMat);
+        trunk.position.y = 6.5 * scale; trunk.castShadow = true;
+        tree.add(trunk);
+        for (let r = 0; r < 5; r++) {
+          const a = (r / 5) * Math.PI * 2;
+          const buttress = new THREE.Mesh(new THREE.BoxGeometry(0.32 * scale, 2.4 * scale, 1.4 * scale), barkMat);
+          buttress.position.set(Math.cos(a) * 0.95 * scale, 1.0 * scale, Math.sin(a) * 0.95 * scale);
+          buttress.rotation.y = -a; buttress.rotation.x = 0.25;
+          tree.add(buttress);
+        }
+        const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(4.6 * scale, 1), canopyMat);
+        crown.position.y = 12.8 * scale;
+        tree.add(crown);
+        for (let v = 0; v < 5; v++) {
+          const va = (v / 5) * Math.PI * 2, vr = (1.6 + (v % 3) * 0.7) * scale;
+          const vine = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.015, 7.5 * scale, 5), rootMat);
+          vine.position.set(Math.cos(va) * vr, 7.2 * scale, Math.sin(va) * vr);
+          tree.add(vine); swayFoliage.push({ mesh: vine, phase: v + x });
+        }
+        if (hasCarving) {
+          const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.95), new THREE.MeshStandardMaterial({ color: 0x7a1c1c, emissive: 0x360707 }));
+          mark.position.set(0, 1.55, 0.92 * scale);
+          tree.add(mark);
+        }
+        scene.add(tree);
+        addCollider(x, z, 1.8 * scale, 1.8 * scale);
+        hideZones.push({ x, z, radius: 2.7 * scale });
+      }
+
+      createGiantBaleteTree(-5.2, 34, 1.15, true);
+      createGiantBaleteTree(6.8, 22, 1.25, false);
+      createGiantBaleteTree(-8.4, 6, 1.45, false);
+      createGiantBaleteTree(9.2, -4, 1.35, false);
+      createGiantBaleteTree(-11.0, -18, 1.3, false);
+
+      for (let i = 0; i < 110; i++) {
+        const angle = (i / 110) * Math.PI * 2, ring = 14 + (i % 6) * 8.5;
+        const tx = Math.cos(angle) * ring + Math.sin(i * 3.7) * 3.5, tz = Math.sin(angle) * ring * 1.25;
+        if (trailNodes.some(([nx, nz]) => Math.hypot(tx - nx, tz - nz) < 4.4)) continue;
+        if (Math.hypot(tx - (-11.5), tz - (-14)) < 6.5) continue;
+        createGiantBaleteTree(tx, tz, 0.75 + (i % 4) * 0.16, false);
+      }
+
+      const fernMat = new THREE.MeshStandardMaterial({ color: 0x152c18, roughness: 0.85, side: THREE.DoubleSide });
+      for (let i = 0; i < 160; i++) {
+        const gx = Math.sin(i * 19.3) * 38, gz = Math.cos(i * 13.7) * 52;
+        if (trailNodes.some(([nx, nz]) => Math.hypot(gx - nx, gz - nz) < 2.1)) continue;
+        const bush = new THREE.Group(); bush.position.set(gx, 0, gz);
+        for (let b = 0; b < 4; b++) {
+          const blade = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.45, 4), fernMat);
+          blade.position.set(Math.cos(b * 1.5) * 0.25, 0.65, Math.sin(b * 1.5) * 0.25);
+          blade.rotation.set(0.28, b * 1.2, 0.15);
+          bush.add(blade);
+        }
+        scene.add(bush); swayFoliage.push({ mesh: bush, phase: i * 0.7 });
+        if (i % 3 === 0) hideZones.push({ x: gx, z: gz, radius: 1.9 });
+      }
+
+      // Extra weapons along trail (Buntot Pagi & Itak)
+      const pagiMesh = createWeapon3DModel('buntot_pagi');
+      pagiMesh.position.set(2.4, 0.5, 31); scene.add(pagiMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'buntot_pagi', mesh: pagiMesh, pos: pagiMesh.position, radius: 2.5, prompt: 'Kunin ang Buntot Pagi' });
+
+      const itakMesh = createWeapon3DModel('itak');
+      itakMesh.position.set(-3.2, 0.5, 18); scene.add(itakMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'itak', mesh: itakMesh, pos: itakMesh.position, radius: 2.5, prompt: 'Kunin ang Itak / Bolo' });
+
+      // False lure jumpscare traps
+      [
+        { x: -13.5, z: 22, msg: '"Elias... dito ang daan..." — Biglang sumulpot ang Maligno!' },
+        { x: 13.8, z: 2, msg: 'May kumaluskos sa likod mo! Biglang humarap ang Maligno!' },
+        { x: 12.5, z: -22, msg: 'May sumigaw sa dilim! Bigla kang sinunggaban ng Maligno!' }
+      ].forEach((trap) => {
+        const lureLight = new THREE.PointLight(0xd99b38, 1.6, 7, 1.8);
+        lureLight.position.set(trap.x, 1.2, trap.z);
+        scene.add(lureLight);
+        falseTraps.push({ ...trap, triggered: false, cooldown: 0 });
+      });
+
+      // Signpost & Balete carving
+      const woodMat = new THREE.MeshStandardMaterial({ color: 0x3b2716, roughness: 0.9 });
+      const signGroup = new THREE.Group(); signGroup.position.set(-2.6, 0, 39); signGroup.rotation.y = 0.35;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.85, 7), woodMat); post.position.y = 0.92;
+      const board = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.55, 0.08), woodMat); board.position.set(0, 1.55, 0.05);
+      signGroup.add(post, board); scene.add(signGroup); addCollider(-2.6, 39, 0.6, 0.6);
+
+      interactables.push({
+        kind: 'note',
+        noteData: { id: 'sign1', title: 'Kupas na Karatula (1998)', body: '"BABALA: Huwag lilingon kapag tinawag ang pangalan mo sa dilim. Ginagaya ng mga Maligno ang boses ng mga kakilala mo."', trans: 'Warning: Do not turn around when called in the dark.' },
+        pos: new THREE.Vector3(-2.6, 1.4, 39), radius: 2.8, prompt: 'Suriin ang Lumang Karatula',
+        onRead: () => { if (state.sequence < 3) setSequence(3); }
+      });
+
+      interactables.push({
+        kind: 'note',
+        noteData: { id: 'carving1', title: 'Kalmot sa Puno ng Balete', body: '"Malalalim na marka ng kuko—halos walong talampakan ang taas. Amoy sunog na tabako."', trans: 'Deep claw marks smelling of burnt tobacco.' },
+        pos: new THREE.Vector3(-4.3, 1.5, 34), radius: 2.8, prompt: 'Suriin ang Marka sa Balete',
+        onRead: () => { if (state.sequence < 3) setSequence(3); }
+      });
+
+      // Shrine with Agimat
+      const shrine = new THREE.Group(); shrine.position.set(5.6, 0, 14);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.1), new THREE.MeshStandardMaterial({ map: textures.stone })); base.position.y = 0.55;
+      const candleLight = new THREE.PointLight(0xff8c32, 2.4, 8, 1.6); candleLight.position.set(0, 1.35, 0.65);
+      shrine.add(base, candleLight); scene.add(shrine); addCollider(5.6, 14, 1.6, 1.3);
+      const agimatMesh = createWeapon3DModel('agimat'); agimatMesh.position.set(5.95, 1.18, 14.45); scene.add(agimatMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'agimat', mesh: agimatMesh, pos: agimatMesh.position, radius: 2.6, prompt: 'Kunin ang Agimat sa Dambana' });
+
+      // Abandoned Hut (Sequence 5)
+      const hutX = -11.5, hutZ = -14.0;
+      const hut = new THREE.Group(); hut.position.set(hutX, 0, hutZ);
+      const nipaMat = new THREE.MeshStandardMaterial({ map: textures.nipa, roughness: 0.96 });
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.25, 5.6), woodMat); floor.position.y = 0.25;
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(5.4, 2.7, 0.22), woodMat); backWall.position.set(0, 1.6, -2.6);
+      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.7, 5.4), woodMat); leftWall.position.set(-2.6, 1.6, 0);
+      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.7, 5.4), woodMat); rightWall.position.set(2.6, 1.6, 0);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(4.6, 2.4, 4), nipaMat); roof.position.y = 4.1; roof.rotation.y = Math.PI / 4;
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.85, 0.9), woodMat); desk.position.set(-1.3, 0.78, -1.6);
+      const lanternLight = new THREE.PointLight(0xff842b, 2.8, 10, 1.6); lanternLight.position.set(-1.3, 1.45, -1.6);
+      hut.add(floor, backWall, leftWall, rightWall, roof, desk, lanternLight); scene.add(hut);
+      addCollider(hutX, hutZ - 2.6, 5.6, 0.5); addCollider(hutX - 2.6, hutZ, 0.5, 5.6); addCollider(hutX + 2.6, hutZ, 0.5, 5.6);
+      hideZones.push({ x: hutX, z: hutZ, radius: 2.6 });
+
+      const diaryMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 0.46), new THREE.MeshStandardMaterial({ color: 0x5c2418 }));
+      diaryMesh.position.set(hutX - 1.5, 1.24, hutZ - 1.6); scene.add(diaryMesh);
+      interactables.push({
+        kind: 'note',
+        noteData: { id: 'diary98', title: 'Talaarawan ng Bantay-Gubat (1998)', body: '"Ang Higanteng Kapre ang nagbabantay sa lagusan palabas ng gubat. Ang tatlong sagradong bilang ng Selyo ng Anito ay 9 - 8 - 4. Gamitin ang Insenso [5] kung hinahabol ka."', trans: 'Anito Seal Code: 9 - 8 - 4. Use Incense [5] when chased.' },
+        pos: diaryMesh.position, radius: 2.6, prompt: 'Basahin ang Talaarawan (1998)',
+        onRead: () => {
+          state.cluesFound = Math.min(3, state.cluesFound + 1);
+          document.getElementById('clue-counter').textContent = `PAHIWATIG: ${state.cluesFound} / 3`;
+          if (state.sequence < 6) setSequence(6);
+        }
+      });
+
+      const insensoMesh = createWeapon3DModel('insenso'); insensoMesh.position.set(hutX - 0.8, 1.24, hutZ - 1.5); scene.add(insensoMesh);
+      interactables.push({ kind: 'weapon', weaponType: 'insenso', mesh: insensoMesh, pos: insensoMesh.position, radius: 2.5, prompt: 'Kunin ang Mangkok ng Insenso' });
+
+      const batMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.22, 10), new THREE.MeshStandardMaterial({ color: 0x2b9eb3, emissive: 0x114b57 }));
+      batMesh.position.set(hutX + 1.5, 0.45, hutZ + 1.1); batMesh.rotation.z = Math.PI / 2; scene.add(batMesh);
+      interactables.push({ kind: 'battery', mesh: batMesh, pos: batMesh.position, radius: 2.4, prompt: 'Kunin ang Baterya (+60% Plaslayt)' });
+
+      // Anito Stone Seal (z = -52)
+      const sealGroup = new THREE.Group(); sealGroup.position.set(0, 0, -52);
+      const monolithMat = new THREE.MeshStandardMaterial({ map: textures.stone, roughness: 0.92 });
+      const stoneSlab = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3.4, 0.55), monolithMat); stoneSlab.position.set(0, 1.7, 0);
+      const runeGlow = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.06, 8, 24), new THREE.MeshBasicMaterial({ color: 0xd96b27 })); runeGlow.position.set(0, 1.75, 0.3);
+      sealGroup.add(stoneSlab, runeGlow); scene.add(sealGroup);
+      const sealCollider = { minX: -2.5, maxX: 2.5, minZ: -52.8, maxZ: -51.2 }; colliders.push(sealCollider);
+      const sealInteractable = { kind: 'anito_seal', pos: new THREE.Vector3(0, 1.5, -51.2), radius: 3.4, prompt: 'Suriin ang Selyo ng Anito (9 - 8 - 4)' };
+      interactables.push(sealInteractable);
+
+      // Higanteng Kapre (4.5m Giant)
+      const kapreGroup = new THREE.Group(); kapreGroup.position.set(-8.4, 0, 6);
+      const kSkin = new THREE.MeshStandardMaterial({ color: 0x17120f, roughness: 0.92 });
+      const kTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.46, 2.15, 10), kSkin); kTorso.position.y = 2.5;
+      const kHead = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 12), kSkin); kHead.position.set(0, 3.92, 0.24);
+      const kEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3b1f })); kEyeL.position.set(-0.12, 3.98, 0.58);
+      const kEyeR = kEyeL.clone(); kEyeR.position.x = 0.12;
+      const emberMesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff5500 })); emberMesh.position.set(0.14, 3.74, 0.98);
+      const emberLight = new THREE.PointLight(0xff4d12, 4.4, 14, 1.6); emberLight.position.set(0.14, 3.76, 1.08);
+      kapreGroup.add(kTorso, kHead, kEyeL, kEyeR, emberMesh, emberLight);
+      scene.add(kapreGroup);
+
+      const kapreWaypoints = [new THREE.Vector3(-8.4, 0, 6), new THREE.Vector3(7.5, 0, -2), new THREE.Vector3(-5.0, 0, -24), new THREE.Vector3(6.5, 0, -38), new THREE.Vector3(-2.5, 0, -45)];
+      const kapreAI = { state: 'PERCHED', wpIndex: 0, timer: 0, stepTimer: 0, lastKnownPlayerPos: new THREE.Vector3(), detectionMeter: 0 };
+
+      // Malignos
+      const malignos = [];
+      function spawnMaligno(type, x, z) {
+        const g = new THREE.Group(); g.position.set(x, 0, z);
+        const h = type === 'mimic' ? 0.95 : 1.4;
+        const torso = new THREE.Mesh(new THREE.ConeGeometry(0.32, h, 7), new THREE.MeshStandardMaterial({ color: 0x161814 })); torso.position.y = h * 0.5;
+        const eyeM = new THREE.MeshBasicMaterial({ color: type === 'mimic' ? 0xd4c84a : 0xff3b3b });
+        const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.038), eyeM); e1.position.set(-0.07, h * 0.88, 0.35);
+        const e2 = e1.clone(); e2.position.x = 0.07;
+        g.add(torso, e1, e2); scene.add(g);
+        malignos.push({ type, group: g, home: new THREE.Vector3(x, 0, z), timer: 2.5 + Math.random() * 4, stun: 0, lungeCooldown: 4.5, phase: Math.random() * 6.28 });
+      }
+      spawnMaligno('mimic', -6.8, 26); spawnMaligno('mimic', 7.4, 8);
+      spawnMaligno('stalker', -9.2, -6); spawnMaligno('stalker', 8.5, -20);
+      spawnMaligno('guardian', -4.5, -42); spawnMaligno('guardian', 4.5, -44);
+
+      function triggerMimicWhisperEvent() {
+        const lines = [
+          { tl: '"Elias... dito sa likod ng mga puno... tulungan mo ako..."', en: '"Elias... behind the trees... help me..."' },
+          { tl: '"Elias! Bakit mo ako iniwan? Lumapit ka sa dilim..."', en: '"Elias! Why did you leave me? Come closer..."' }
+        ];
+        const pick = lines[Math.floor(Math.random() * lines.length)];
+        audio.playWhisperSpatial(Math.random() > 0.5 ? 0.85 : -0.85, 1.0);
+        showSubtitle('BOSES NI MATEO (?)', pick.tl, pick.en, 4500);
+      }
+
+      /* ----------------------------------------------------------------------
+         WEAPONS, PUZZLE & INPUTS
+         ---------------------------------------------------------------------- */
+      function updateWeaponHUD() {
+        ['sulo', 'buntot_pagi', 'itak', 'agimat', 'insenso'].forEach((key, idx) => {
+          const el = document.getElementById(`slot-${idx + 1}`);
+          el.classList.toggle('has-item', !!state.ownedWeapons[key]);
+          el.classList.toggle('active', state.equippedWeapon === key);
+        });
+        document.getElementById('equipped-name').textContent = state.equippedWeapon ? state.equippedWeapon.toUpperCase() : 'WALANG HAWAK';
+      }
+
+      function equipWeapon(type) {
+        if (type && !state.ownedWeapons[type]) return;
+        state.equippedWeapon = type;
+        Object.entries(rig.fpWeapons).forEach(([k, m]) => { m.visible = (k === type); });
+        rig.suloHandLight.intensity = type === 'sulo' ? 4.2 : 0;
+        updateWeaponHUD();
+      }
+      equipWeapon(state.equippedWeapon);
+
+      function performAction() {
+        if (!state.isPlaying || state.isPaused || state.isCinematic || state.isNoteOpen || state.isGameOver || state.attackCooldown > 0) return;
+        const w = state.equippedWeapon;
+        if (!w) { showToast('Wala kang hawak na gamit [1-5].'); return; }
+        state.attackCooldown = 0.5; state.swingAnim = 1.0;
+        audio.playWeaponSwing(w);
+        if (w === 'insenso') {
+          state.insensoTimer = 18.0;
+          showToast('Nagsindi ka ng Insenso! Hindi makakalapit ang Kapre at Maligno.');
+          if (kapreAI.state === 'CHASE') { kapreAI.state = 'STUNNED'; kapreAI.timer = 5.0; }
+          return;
+        }
+        const fwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw);
+        malignos.forEach(m => {
+          const toM = new THREE.Vector3().subVectors(m.group.position, state.pos); toM.y = 0;
+          if (toM.length() < 3.6 && fwd.dot(toM.normalize()) > 0.42) {
+            m.stun = 4.5; m.lungeCooldown = 6.0;
+            audio.playCreatureScreech();
+            showToast('Napaatras ang Maligno!');
+          }
+        });
+      }
+
+      const codeDigits = [0, 0, 0];
+      function openAnitoSealModal() {
+        state.isNoteOpen = true;
+        try { document.exitPointerLock?.(); } catch (_) {}
+        document.getElementById('code-hint').textContent = 'Ilagay ang tatlong bilang mula sa talaarawan (1998).';
+        document.getElementById('code-msg').textContent = '';
+        codeDigits.forEach((v, i) => { document.getElementById('dig-' + i).textContent = v; });
+        document.getElementById('code-modal').classList.add('open');
+      }
+
+      document.querySelectorAll('.wheel [data-w]').forEach(btn => {
+        btn.onclick = () => {
+          const w = +btn.dataset.w, d = +btn.dataset.d;
+          codeDigits[w] = (codeDigits[w] + d + 10) % 10;
+          document.getElementById('dig-' + w).textContent = codeDigits[w];
+          audio.playFlashlightClick();
+        };
+      });
+      document.getElementById('code-try').onclick = () => {
+        if (codeDigits[0] === 9 && codeDigits[1] === 8 && codeDigits[2] === 4) {
+          state.anitoPuzzleSolved = true; state.isNoteOpen = false;
+          document.getElementById('code-modal').classList.remove('open');
+          stoneSlab.position.y = -2.2; runeGlow.material.color.setHex(0x63e696);
+          const idx = colliders.indexOf(sealCollider); if (idx > -1) colliders.splice(idx, 1);
+          sealInteractable.prompt = 'Tumakbo Palabas sa Lagusan ng Bundok';
+          showToast('Bumukas ang Selyo ng Anito! Tumakbo na palabas!');
+          setSequence(7);
+        } else {
+          state.isNoteOpen = false;
+          document.getElementById('code-modal').classList.remove('open');
+          triggerJumpscare('maligno', 16, 'Maling kodigo! Sinunggaban ka ng Maligno!');
+        }
+      };
+      document.getElementById('code-close').onclick = () => { state.isNoteOpen = false; document.getElementById('code-modal').classList.remove('open'); };
+
+      const collectedDocs = [];
+      let currentHovered = null;
+
+      function handleInteract() {
+        if (state.isNoteOpen) {
+          state.isNoteOpen = false;
+          document.getElementById('note-modal').classList.remove('open');
+          document.getElementById('journal-modal').classList.remove('open');
+          return;
+        }
+        if (!currentHovered || state.isCinematic || state.isPaused) return;
+        const it = currentHovered;
+        if (it.kind === 'weapon') {
+          state.ownedWeapons[it.weaponType] = true; scene.remove(it.mesh);
+          interactables.splice(interactables.indexOf(it), 1); equipWeapon(it.weaponType);
+          showToast(`Nakuha: ${it.weaponType.toUpperCase()}`);
+        } else if (it.kind === 'note') {
+          state.isNoteOpen = true;
+          try { document.exitPointerLock?.(); } catch (_) {}
+          document.getElementById('note-title').textContent = it.noteData.title;
+          document.getElementById('note-body').textContent = it.noteData.body;
+          document.getElementById('note-trans').textContent = it.noteData.trans;
+          document.getElementById('note-modal').classList.add('open');
+          if (!collectedDocs.some(d => d.id === it.noteData.id)) collectedDocs.push(it.noteData);
+          if (it.onRead) it.onRead();
+        } else if (it.kind === 'battery') {
+          state.battery = Math.min(100, state.battery + 60); state.flashlightOn = true;
+          scene.remove(it.mesh); interactables.splice(interactables.indexOf(it), 1);
+          showToast('Nakakuha ng Baterya (+60% Plaslayt)');
+        } else if (it.kind === 'anito_seal') {
+          if (!state.anitoPuzzleSolved) openAnitoSealModal();
+          else finishChapter2();
+        }
+      }
+
+      function finishChapter2() {
+        if (state.isGameOver) return;
+        state.isGameOver = true; state.isPlaying = false;
+        try { document.exitPointerLock?.(); } catch (_) {}
+        document.getElementById('end-title').textContent = 'NAKALABAS SA GUBAT';
+        document.getElementById('end-title').style.color = '#e5c37a';
+        document.getElementById('end-sub').textContent = 'Nakaligtas si Elias sa Gubat na Bumubulong, ngunit sa dilim ng bundok ay maririnig pa rin ang mga yapak ng Higanteng Kapre...';
+        const q = document.getElementById('end-quote'); q.style.display = 'block';
+        q.textContent = '"Kapag tinawag ang pangalan mo sa gubat, huwag kang lilingon."';
+        document.getElementById('end-screen').classList.remove('hidden');
+      }
+
+      const keys = {}; let isDraggingLook = false, prevX = 0, prevY = 0; const joyInput = { x: 0, y: 0 };
+      function onKeyDown(e) {
+        keys[e.code] = true;
+        if (e.code === 'Escape') {
+          if (state.isNoteOpen) {
+            state.isNoteOpen = false;
+            document.getElementById('note-modal').classList.remove('open');
+            document.getElementById('code-modal').classList.remove('open');
+            document.getElementById('journal-modal').classList.remove('open');
+          } else if (state.isPlaying && !state.isGameOver) togglePause();
+        }
+        if (!state.isPlaying || state.isPaused || state.isNoteOpen) return;
+        if (e.code === 'KeyE') handleInteract();
+        if (e.code === 'KeyJ') {
+          state.isNoteOpen = true;
+          const list = document.getElementById('journal-list');
+          list.innerHTML = collectedDocs.length ? collectedDocs.map(d => `<div class="j-item"><b>${d.title}</b><div>${d.body}</div></div>`).join('') : '<div class="j-empty">Wala pang naitatalang pahiwatig.</div>';
+          document.getElementById('journal-modal').classList.add('open');
+        }
+        if (e.code === 'KeyG' && state.equippedWeapon) {
+          state.ownedWeapons[state.equippedWeapon] = false; equipWeapon(null); audio.playWeaponDrop();
+        }
+        if (e.code === 'KeyF' && state.battery > 1) { state.flashlightOn = !state.flashlightOn; audio.playFlashlightClick(); }
+        if (e.code === 'KeyC' || e.code === 'ControlLeft') state.isCrouching = !state.isCrouching;
+        if (e.code === 'Digit1') equipWeapon('sulo');
+        if (e.code === 'Digit2') equipWeapon('buntot_pagi');
+        if (e.code === 'Digit3') equipWeapon('itak');
+        if (e.code === 'Digit4') equipWeapon('agimat');
+        if (e.code === 'Digit5') equipWeapon('insenso');
+      }
+      function onKeyUp(e) { keys[e.code] = false; }
+      function onMouseDown(e) {
+        if (!state.isPlaying || state.isPaused || state.isNoteOpen) return;
+        audio.init(); isDraggingLook = true; prevX = e.clientX; prevY = e.clientY;
+        try { canvas.requestPointerLock?.(); } catch (_) {}
+        if (e.button === 0) performAction();
+      }
+      function onMouseMove(e) {
+        if (!state.isPlaying || state.isCinematic || state.isPaused || state.isNoteOpen) return;
+        if (document.pointerLockElement === canvas) {
+          state.yaw -= e.movementX * 0.0024;
+          state.pitch = THREE.MathUtils.clamp(state.pitch - e.movementY * 0.0024, -1.25, 1.25);
+        } else if (isDraggingLook) {
+          state.yaw -= (e.clientX - prevX) * 0.0045;
+          state.pitch = THREE.MathUtils.clamp(state.pitch - (e.clientY - prevY) * 0.0045, -1.25, 1.25);
+          prevX = e.clientX; prevY = e.clientY;
+        }
+      }
+      function onMouseUp() { isDraggingLook = false; }
+      function togglePause() {
+        state.isPaused = !state.isPaused;
+        document.getElementById('pause-screen').classList.toggle('hidden', !state.isPaused);
+        document.body.classList.toggle('menu-open', state.isPaused);
+      }
+
+      window.addEventListener('keydown', onKeyDown); window.addEventListener('keyup', onKeyUp);
+      canvas.addEventListener('mousedown', onMouseDown); document.addEventListener('mousemove', onMouseMove); window.addEventListener('mouseup', onMouseUp);
+      document.getElementById('pause-btn-hud').onclick = togglePause; document.getElementById('resume-btn').onclick = togglePause;
+      document.getElementById('close-note-btn').onclick = () => { state.isNoteOpen = false; document.getElementById('note-modal').classList.remove('open'); };
+      document.getElementById('journal-close').onclick = () => { state.isNoteOpen = false; document.getElementById('journal-modal').classList.remove('open'); };
+      document.getElementById('save-checkpoint-btn').onclick = () => saveProgress({ difficulty: diffId, hp: state.hp, battery: state.battery, ownedWeapons: state.ownedWeapons, equippedWeapon: state.equippedWeapon });
+
+      function isPlayerHidden() {
+        if (!state.isCrouching) return false;
+        return hideZones.some(hz => Math.hypot(state.pos.x - hz.x, state.pos.z - hz.z) < hz.radius);
+      }
+
+      // Intro Sequence
+      setSequence(1);
+      document.body.classList.add('cinematic');
+      const banner = document.getElementById('chapter-banner'); banner.classList.add('visible');
+      showSubtitle('ELIAS', '"Pumasok ako sa gubat upang makatakas... pero parang mas nakakatakot ang mga bumubulong sa dilim."', '"I entered the forest to escape... yet the whispers in the dark feel far more terrifying."', 5000);
+      setTimeout(() => banner.classList.remove('visible'), 3600);
+      setTimeout(() => { state.isCinematic = false; document.body.classList.remove('cinematic'); setSequence(2); }, 4600);
+
+      let rafId = null; const clock = new THREE.Clock();
+      function animate() {
+        rafId = requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+        const elapsed = clock.getElapsedTime();
+
+        swayFoliage.forEach(f => { f.mesh.rotation.z = Math.sin(elapsed * 1.5 + f.phase) * 0.05; });
+        if (state.jumpscareCooldown > 0) state.jumpscareCooldown -= dt;
+        if (state.jumpscareTimer > 0) {
+          state.jumpscareTimer -= dt;
+          scarePropGroup.position.z = -0.82 + Math.sin(elapsed * 45) * 0.08;
+        }
+
+        if (state.isPlaying && !state.isPaused && !state.isGameOver) {
+          if (state.isCinematic) {
+            state.pos.z -= dt * 1.8;
+            camera.position.set(state.pos.x, 1.72, state.pos.z);
+            camera.rotation.set(state.pitch, state.yaw, 0);
+          } else if (!state.isNoteOpen) {
+            let moveForward = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0) - joyInput.y;
+            let moveRight = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0) + joyInput.x;
+            const inputLen = Math.hypot(moveForward, moveRight);
+            if (inputLen > 1) { moveForward /= inputLen; moveRight /= inputLen; }
+
+            const wantsSprint = (keys['ShiftLeft'] || keys['ShiftRight']) && moveForward > 0.2 && !state.isCrouching;
+            state.stamina = wantsSprint && state.stamina > 5 ? Math.max(0, state.stamina - dt * 24) : Math.min(100, state.stamina + dt * 14);
+            const speed = state.isCrouching ? 2.1 : (wantsSprint && state.stamina > 5 ? 5.6 : 3.5);
+            const fVec = new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+            const rVec = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
+            const mv = new THREE.Vector3().addScaledVector(fVec, moveForward * speed * dt).addScaledVector(rVec, moveRight * speed * dt);
+
+            const blocked = (nx, nz) => nx < -38 || nx > 38 || nz < -56 || nz > 56 || colliders.some(c => nx + 0.42 > c.minX && nx - 0.42 < c.maxX && nz + 0.42 > c.minZ && nz - 0.42 < c.maxZ);
+            if (!blocked(state.pos.x + mv.x, state.pos.z)) state.pos.x += mv.x;
+            if (!blocked(state.pos.x, state.pos.z + mv.z)) state.pos.z += mv.z;
+            state.pos.y = THREE.MathUtils.lerp(state.pos.y, state.isCrouching ? 1.02 : 1.72, dt * 10);
+
+            if (inputLen > 0.1) {
+              state.bobTimer += dt * (wantsSprint ? 13 : 8.5);
+              state.stepTimer -= dt * (wantsSprint ? 1.6 : 1.0);
+              if (state.stepTimer <= 0) { state.stepTimer = 0.46; audio.playFootstep(wantsSprint); }
+            }
+            camera.position.set(state.pos.x, state.pos.y + (inputLen > 0.1 ? Math.sin(state.bobTimer) * 0.03 : 0), state.pos.z);
+            camera.rotation.set(state.pitch, state.yaw, 0);
+
+            falseTraps.forEach(tr => {
+              if (tr.cooldown > 0) tr.cooldown -= dt;
+              if (!tr.triggered && tr.cooldown <= 0 && Math.hypot(state.pos.x - tr.x, state.pos.z - tr.z) < 2.6) {
+                tr.triggered = true; tr.cooldown = 15.0;
+                triggerJumpscare('maligno', 12, tr.msg);
+                setTimeout(() => { tr.triggered = false; }, 15000);
+              }
+            });
+
+            state.ambientWhisperTimer -= dt;
+            if (state.ambientWhisperTimer <= 0) {
+              state.ambientWhisperTimer = 10 + Math.random() * 8;
+              if (state.sequence >= 3) triggerMimicWhisperEvent();
+              else audio.playWhisperSpatial(Math.random() * 1.6 - 0.8, 1.0);
+            }
+
+            if (!state.hutEntered && Math.hypot(state.pos.x - hutX, state.pos.z - hutZ) < 4.5) {
+              state.hutEntered = true; setSequence(5);
+              showSubtitle('ELIAS', '"Isang lumang kubo... Baka nandito ang kodigo para mabuksan ang lagusan."', '"An abandoned hut... The code might be inside."', 4500);
+            }
+            if (state.anitoPuzzleSolved && state.pos.z < -54.5) finishChapter2();
+          }
+
+          // Flashlight
+          rig.fpFlashlightBody.visible = state.flashlightOn && state.battery > 0;
+          if (state.flashlightOn && state.battery > 0) {
+            state.battery = Math.max(0, state.battery - dt * DIFF.batt);
+            flashlight.intensity = state.battery < 14 ? (Math.sin(elapsed * 32) > 0.35 ? 1.2 : 5.6) : 6.4;
+            if (state.battery <= 0) { state.flashlightOn = false; flashlight.intensity = 0; showToast('Namatay ang plaslayt!'); }
+          } else flashlight.intensity = 0;
+          flashlight.position.copy(camera.position);
+          const lDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+          flashlightTarget.position.copy(camera.position).addScaledVector(lDir, 10);
+
+          if (state.insensoTimer > 0) state.insensoTimer -= dt;
+          if (state.attackCooldown > 0) state.attackCooldown -= dt;
+          if (state.swingAnim > 0) state.swingAnim = Math.max(0, state.swingAnim - dt * 3.8);
+          const swingArc = Math.sin(state.swingAnim * Math.PI);
+          rig.rightArmRig.root.rotation.set(0.32 + swingArc * 1.0, -0.14 + swingArc * 0.4, 0.08 - swingArc * 0.5);
+
+          // Kapre AI
+          const toPlayer = new THREE.Vector3().subVectors(state.pos, kapreGroup.position); toPlayer.y = 0;
+          const distK = toPlayer.length();
+          const hidden = isPlayerHidden();
+          if (kapreAI.state === 'PERCHED') {
+            kapreGroup.lookAt(state.pos.x, 0, state.pos.z);
+            if (state.pos.z < 18 || distK < 13) {
+              kapreAI.state = 'PATROL';
+              if (!state.kapreSpotted) {
+                state.kapreSpotted = true; setSequence(4);
+                triggerJumpscare('kapre', 8, 'Nakatayo ang Higanteng Kapre sa dilim!');
+              }
+            }
+          } else if (kapreAI.state === 'STUNNED') {
+            kapreAI.timer -= dt; if (kapreAI.timer <= 0) kapreAI.state = 'PATROL';
+          } else {
+            const effRange = hidden ? 4.2 : (state.flashlightOn ? 18 : 9);
+            if (distK < effRange && state.insensoTimer <= 0) {
+              kapreAI.detectionMeter += dt * (hidden ? 0.25 : 1.2) * DIFF.dmg;
+              if (kapreAI.detectionMeter >= 1.0 && kapreAI.state !== 'CHASE') {
+                kapreAI.state = 'CHASE'; triggerJumpscare('kapre', 12, 'Nakita ka ng Higanteng Kapre! Magtago [C]!');
+              }
+            } else kapreAI.detectionMeter = Math.max(0, kapreAI.detectionMeter - dt * 0.45);
+
+            const target = kapreAI.state === 'CHASE' ? state.pos : kapreWaypoints[kapreAI.wpIndex];
+            const spd = kapreAI.state === 'CHASE' ? DIFF.speed * 0.94 : 2.2;
+            const dVec = new THREE.Vector3().subVectors(target, kapreGroup.position); dVec.y = 0;
+            if (dVec.length() > 0.3) {
+              dVec.normalize(); kapreGroup.position.addScaledVector(dVec, spd * dt);
+              kapreGroup.lookAt(target.x, 0, target.z);
+            } else if (kapreAI.state === 'PATROL') {
+              kapreAI.wpIndex = (kapreAI.wpIndex + 1) % kapreWaypoints.length;
+            }
+            if (kapreAI.state === 'CHASE' && distK < 2.3) {
+              state.hp = Math.max(0, state.hp - dt * 30 * DIFF.dmg);
+              if (state.jumpscareCooldown <= 0) triggerJumpscare('kapre', 15, 'Sinuntok ng Higanteng Kapre ang lupa!');
+            }
+          }
+
+          // Maligno AI
+          const fwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw);
+          malignos.forEach(m => {
+            if (m.stun > 0) { m.stun -= dt; return; }
+            if (m.lungeCooldown > 0) m.lungeCooldown -= dt;
+            const toP = new THREE.Vector3().subVectors(state.pos, m.group.position); toP.y = 0;
+            const distM = toP.length(); m.group.lookAt(state.pos.x, 0, state.pos.z);
+            if (m.type === 'mimic') {
+              m.group.position.x = m.home.x + Math.sin(elapsed * 1.5 + m.phase) * 2.5;
+              if (distM < 2.5 && !hidden && m.lungeCooldown <= 0 && state.insensoTimer <= 0) {
+                m.lungeCooldown = 9.0; triggerJumpscare('maligno', 12, 'Biglang sumulpot ang Maligno!');
+              }
+            } else if (m.type === 'stalker') {
+              const looking = fwd.dot(toP.clone().negate().normalize()) > 0.55 && state.flashlightOn;
+              if (!looking && !hidden && distM < 22 && distM > 1.7 && state.insensoTimer <= 0) m.group.position.addScaledVector(toP.normalize(), 2.7 * dt);
+              else if (distM <= 1.7 && !hidden && state.insensoTimer <= 0 && m.lungeCooldown <= 0) {
+                m.lungeCooldown = 8.5; triggerJumpscare('maligno', 14, 'Nasa likod mo na ang Maligno!');
+              }
+            } else {
+              m.phase += dt * 0.85;
+              m.group.position.x = m.home.x + Math.cos(m.phase) * 3.8; m.group.position.z = m.home.z + Math.sin(m.phase) * 3.8;
+              if (distM < 2.2 && !hidden && state.insensoTimer <= 0 && m.lungeCooldown <= 0) {
+                m.lungeCooldown = 8.0; triggerJumpscare('maligno', 14, 'Hinarang ka ng Maligno!');
+              }
+            }
+          });
+
+          // Interaction Raycast
+          currentHovered = null;
+          let bestDist = 3.4;
+          for (const it of interactables) {
+            const toIt = new THREE.Vector3().subVectors(it.pos, state.pos); toIt.y = 0;
+            const d = toIt.length();
+            if (d < (it.radius || 2.6) && d < bestDist && fwd.dot(toIt.normalize()) > 0.52) { bestDist = d; currentHovered = it; }
+          }
+          const promptEl = document.getElementById('interact-prompt');
+          if (currentHovered && !state.isCinematic && !state.isNoteOpen) {
+            document.getElementById('reticle').classList.add('interactive');
+            promptEl.innerHTML = `<span class="key-badge">E</span> ${currentHovered.prompt}`;
+            promptEl.classList.add('visible');
+          } else {
+            document.getElementById('reticle').classList.remove('interactive');
+            promptEl.classList.remove('visible');
+          }
+
+          const threat = THREE.MathUtils.clamp(1 - distK / 24, 0, 1);
+          audio.update(dt, threat, state.ownedWeapons.agimat);
+          document.getElementById('hp-val').textContent = `${Math.ceil(state.hp)}%`;
+          document.getElementById('health-fill').style.width = `${state.hp}%`;
+          document.getElementById('stam-val').textContent = `${Math.ceil(state.stamina)}%`;
+          document.getElementById('stamina-fill').style.width = `${state.stamina}%`;
+          document.getElementById('bat-val').textContent = `${Math.ceil(state.battery)}%`;
+          document.getElementById('battery-fill').style.width = `${state.battery}%`;
+
+          const stealthEl = document.getElementById('stealth-indicator');
+          const stealthText = document.getElementById('stealth-text');
+          stealthEl.classList.remove('hidden-state', 'danger-state');
+          if (kapreAI.state === 'CHASE' && !hidden) { stealthEl.classList.add('danger-state'); stealthText.textContent = 'HINAHABOL NG KAPRE!'; }
+          else if (hidden) { stealthEl.classList.add('hidden-state'); stealthText.textContent = 'NAKATAGO SA DILIM'; }
+          else if (state.isCrouching) stealthText.textContent = 'NAKAYUKO';
+          else stealthText.textContent = 'NAKIKITA';
+
+          if (state.shake > 0) {
+            state.shake = Math.max(0, state.shake - dt * 1.4);
+            camera.position.x += (Math.random() - 0.5) * 0.22 * state.shake;
+            camera.position.y += (Math.random() - 0.5) * 0.22 * state.shake;
+          }
+        }
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      activeCleanup = () => {
+        cancelAnimationFrame(rafId);
+        window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp);
+        canvas.removeEventListener('mousedown', onMouseDown); document.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp);
+      };
+    }
+
+    document.getElementById('start-game-btn').addEventListener('click', () => {
+      audio.init(); document.getElementById('start-screen').classList.add('hidden');
+      document.body.classList.remove('menu-open'); launchChapter2(null);
+    });
+    document.getElementById('load-save-btn').addEventListener('click', () => {
+      const saved = loadProgress(); if (!saved) return;
+      audio.init(); document.getElementById('start-screen').classList.add('hidden');
+      document.body.classList.remove('menu-open'); launchChapter2(saved);
+    });
+    document.getElementById('restart-btn').addEventListener('click', () => window.location.reload());
+    document.getElementById('end-restart-btn').addEventListener('click', () => window.location.reload());
+  })();
+  </script>
+</body>
+</html>
